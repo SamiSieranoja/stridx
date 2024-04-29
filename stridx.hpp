@@ -213,12 +213,11 @@ public:
     int maxChars = 8;
     int minChars = 2;
 
-    int nchars = 8;
     std::string str = p->str;
     if (p->str.size() < 2) {
       return;
     }
-    if (p->str.size() < maxChars) {
+    if (static_cast<int>(p->str.size()) < maxChars) {
       maxChars = p->str.size();
     }
 
@@ -234,10 +233,7 @@ public:
         map = dirmaps[sublen];
       }
 
-      int count = str.size() - maxChars + 1;
-
-      omp_lock_t writelock;
-      omp_init_lock(&writelock);
+      int count = str.size() - sublen + 1;
 
       for (int i = 0; i <= count; i++) {
         int64_t key = getKeyAtIdx(str, i, sublen);
@@ -248,7 +244,6 @@ public:
           (*map)[key] = new std::set<PathSegment *>;
         }
         (*map)[key]->insert(p);
-
       }
     }
   }
@@ -298,7 +293,7 @@ public:
   // is of length <nchars>.
   std::vector<PathSegment *> findSimilarForNgram(std::string str, int i, int nchars, SegMap &map) {
 
-    assert(i + nchars <= str.size());
+    assert(i + nchars <= static_cast<int>(str.size()));
     std::vector<PathSegment *> res;
 
     // Take substring of str, starting at i, spanning nchars
@@ -319,14 +314,14 @@ public:
                     std::vector<SegMap *> &map // filemaps or dirmaps
   ) {
     int maxChars = 8;
-    int minChars = 2; // TODO
-    if (query.size() < maxChars) {
+    int minChars = 2;
+    if (static_cast<int>(query.size()) < maxChars) {
       maxChars = query.size();
     }
 
     // Loop all substring lengths between minChars..maxChars
     for (int sublen = minChars; sublen <= maxChars; sublen++) {
-      int count = query.size() - maxChars + 1;
+      int count = query.size() - sublen + 1;
 
       // Loop all possible start positions
       for (int i = 0; i < count; i++) {
@@ -357,6 +352,26 @@ public:
         }
         p = p->parent;
       }
+    }
+  }
+
+  void debug() {
+
+    int nchars = 3;
+    for (const auto &[key, value] : (*filemaps[nchars])) {
+      int64_t x;
+      x = key;
+      int multip = nchars * 8;
+      for (int i = 0; i <= nchars; i++) {
+        char c = (x >> multip) & 255;
+        std::cout << c;
+        multip -= 8;
+      }
+      std::cout << "\n";
+      // for (auto y : *value) {
+        // std::cout << y << " ";
+      // }
+      // std::cout << "\n";
     }
   }
 

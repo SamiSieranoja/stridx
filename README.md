@@ -1,6 +1,41 @@
 # stridx
-Fast fuzzy string similarity search and indexing (for filenames) 
+This library provides fast fuzzy string similarity search and indexing. It has been mainly developed for indexing filepaths, but can be used for other types of strings aswell. It can easily handle fuzzy searches for more than 100,000 filepaths.
 
+The fuzziness means that candidate filepaths do not need to include exact match of the query string. They are considered a good match if they include parts of the query string, and even if those parts are in the wrong order.
+
+The library can be applied for UTF-8 data also, although there is a small bias in scoring for multibyte characters.
+
+
+## String similarity calculation
+
+Once the index has been created, the contents can be searched to find the best matching strings. 
+
+To be considered a candidate path, the file component of the path (e.g. file.txt)
+is required to have at least a substring of two characters in common with the
+query string. If that condition is true, then the directories will also add to the
+score, although with a smaller weight.
+
+The scores that measure how good a candidate is, are calculated as follows (somewhat simplified).  
+For each single character substring c in the query string:
+
+ - find the largest substring in the query which includes the substring c and is also included in the candidate path
+ - take the lenght of that substring as score
+    
+Sum up the scores for each character c and divide by (string length)^2
+  
+For example, if query = "rngnomadriv" 
+and candidate is "./drivers/char/hw_random/nomadik-rng.c", then scores are calculated as follows:
+```
+    rngnomadriv
+    33355555444 (subscores)
+    FFFFFFFFDDD (F=file component, D=dir component)
+    score1=(3+3+3+5+5+5+5+5+(4+4+4)*0.7)
+
+    In final score, we give a small penalty for larger candidate filenames:
+    Divide main part of score with (query string length)^2 
+    and minor part by (query string length)*(candidate string length)
+    score = score1/(11*11)*0.97 + score1/(11*38)*0.03 = 0.342944
+```
 # C++ API
 See demo.cpp
 ```cpp

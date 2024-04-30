@@ -41,19 +41,17 @@ int main() {
 
 Output:
 ```
-Indexing creation time for 89828 file paths (seconds): 2.66149
-Search time (seconds): 0.0404417
+Indexing creation time for 89828 file paths (seconds): 2.89097
+Search time (seconds): 0.0346287
 query string: rngnomadriv
 Top 20 matches:
-56383 0.329053 ./drivers/char/hw_random/nomadik-rng.c
-65420 0.26059 ./drivers/pinctrl/nomadik
-59594 0.255016 ./drivers/clocksource/nomadik-mtu.c
-58689 0.255016 ./drivers/clk/clk-nomadik.c
-47837 0.255016 ./drivers/i2c/busses/i2c-nomadik.c
-55819 0.254551 ./drivers/gpio/gpio-nomadik.c
-51950 0.254149 ./drivers/gpu/drm/pl111/pl111_nomadik.c
-51952 0.254149 ./drivers/gpu/drm/pl111/pl111_nomadik.h
-65421 0.253486 ./drivers/pinctrl/nomadik/pinctrl-nomadik.c
+56383 0.342944 ./drivers/char/hw_random/nomadik-rng.c
+65420 0.271396 ./drivers/pinctrl/nomadik
+58689 0.271126 ./drivers/clk/clk-nomadik.c
+55819 0.270893 ./drivers/gpio/gpio-nomadik.c
+47837 0.270431 ./drivers/i2c/busses/i2c-nomadik.c
+59594 0.270355 ./drivers/clocksource/nomadik-mtu.c
+51950 0.270088 ./drivers/gpu/drm/pl111/pl111_nomadik.c
 ...
 
 ```

@@ -16,11 +16,6 @@
 
 #include "unordered_dense.h"
 
-using std::cout;
-using std::pair;
-using std::string;
-using std::vector;
-
 // Transforms input string as follows:
 // '/foo/bar/file1.txt'
 // => vector{"foo", "bar", "file1.txt"}
@@ -92,16 +87,26 @@ public:
   PathSegment(std::string _str) : str(_str), parent(NULL) {}
   PathSegment(std::string _str, int _fileId)
       : str(_str), fileId(_fileId), cand(NULL), parent(NULL) {}
+  int size() {
+    int sz = str.size();
+    PathSegment *cur = parent;
+    // Sum up length of parent segments (+1 for divisors)
+    while (cur->parent != NULL) {
+      sz += cur->str.size() + 1;
+      cur = cur->parent;
+    }
+    return sz;
+  }
 };
 
 // Candidate for result in string (filename) search
 class Candidate {
 public:
-  std::vector<int> v_charscore;
+  std::vector<float> v_charscore;
   PathSegment *seg;
   int fileId;
   // The string that this candidate represents
-  string str;
+  std::string str;
   int len; // Query string length
 
   float minscore;
@@ -109,7 +114,7 @@ public:
   int candLen; // Length of candidate
 
   Candidate(){};
-  Candidate(int _fileId, string _str, int _len) : fileId(_fileId), str(_str), len(_len) {
+  Candidate(int _fileId, std::string _str, int _len) : fileId(_fileId), str(_str), len(_len) {
     // Initialize v_charscores with zeros
     v_charscore.resize(len, 0);
     candLen = str.size();
@@ -119,13 +124,15 @@ public:
   Candidate(PathSegment *_seg, int _len) : seg(_seg), len(_len) {
     // Initialize v_charscores with zeros
     v_charscore.resize(len, 0);
-    candLen = seg->str.size();
+    candLen = seg->size();
   }
 
   float getScore() {
     int i = 0;
     float score = 0.0;
-    for (int &charscore : v_charscore) {
+    candLen = seg->size();
+
+    for (float &charscore : v_charscore) {
       score += charscore;
       i++;
     }
@@ -133,12 +140,12 @@ public:
     float div2 = len * candLen;
     float score1 = score / div;
     float score2 = score / div2;
+
     score = score1 * 0.97 + score2 * 0.03;
     return score;
   }
 
-  int operator[](int idx) { return v_charscore[idx]; }
-  // TODO: all
+  float operator[](int idx) { return v_charscore[idx]; }
 };
 
 // This seems to give 10x speed improvement over std::unordered_map
@@ -148,8 +155,9 @@ typedef ankerl::unordered_dense::map<int64_t, std::set<PathSegment *> *> SegMap;
 typedef std::unordered_map<float, Candidate> CandMap;
 
 class StringIndex {
-public:
+private:
   int tmp;
+  char dirSeparator = '/'; // Usually '/', '\' or '\0' (no separator)
 
   std::vector<SegMap *> dirmaps;
   std::vector<SegMap *> filemaps;
@@ -160,7 +168,9 @@ public:
   std::unordered_map<int, PathSegment *> seglist;
   PathSegment *root;
   int dirId = 0;
+  float dirWeight = 0.7; // Give only 70% of score if match is for a directory
 
+public:
   StringIndex() {
     root = new PathSegment();
     root->parent = NULL;
@@ -175,6 +185,9 @@ public:
     std::cout << "OPENMP enabled\n";
 #endif
   }
+
+  void setDirSeparator(char sep) { dirSeparator = sep; }
+  void setDirWeight(float val) { dirWeight = val; }
 
   ~StringIndex() {
     for (auto x : dirmaps) {
@@ -196,6 +209,167 @@ public:
     clearPathSegmentChildren(root);
   }
 
+  void addStrToIndex(std::string filePath, int fileId) {
+    addStrToIndex(filePath, fileId, dirSeparator);
+  }
+
+  /**
+   * Add a string to the index to be search for afterwards
+   *
+   * @param filePath String to index (e.g. /home/user/Project/main.cpp).
+   * @param fileId Unique identifier for filePath. Will be return as result from findSimilar.
+   * @param separator Can be used to split filePath to components (e.g. 'home','user'...). Usually
+   * one of {'\\', '/', '\0' (no separation)}.
+   */
+  void addStrToIndex(std::string filePath, int fileId, const char &separator) {
+
+    std::vector<std::string> segs;
+
+    if (separator == '\0') {
+      // No separation to directories & files
+      segs = {filePath};
+    } else {
+      // Split path to segments
+      segs = splitString(filePath, separator);
+    }
+
+    PathSegment *prev = NULL;
+    prev = root;
+    // Add segments to a tree type data structure
+    // e.g. addStrToIndex('/foo/bar/file1.txt' ..)
+    //      addStrToIndex('/foo/faa/file2.txt' ..)
+    // forms structure:
+    // root -> foo |-> bar -> file1,txt
+    //             |-> faa -> file2.txt
+    for (auto _x = segs.begin(); _x != segs.end(); ++_x) {
+      auto x = *_x;
+      PathSegment *p;
+
+      auto it = prev->children.find(x);
+      // this part of the path already exists in the tree
+      if (it != prev->children.end()) {
+        p = it->second;
+      } else {
+        p = new PathSegment(x, fileId);
+        p->parent = prev;
+        // If this is last item in segs
+        if (_x == std::prev(segs.end())) {
+          // therefore, it is a file.
+          p->type = File;
+          seglist[fileId] = p;
+        } else {
+          p->type = Dir;
+          p->fileId = dirId;
+          // Files use user input Id. Directories need to have it generated
+          dirId++;
+        }
+        prev->children[x] = p;
+        addPathSegmentKeys(p);
+      }
+
+      prev = p;
+    }
+  }
+
+  /**
+  * The search will find filepaths similar to the input string
+
+  To be considered a candidate path, the file component of the path (e.g. file.txt)
+  is required to have at least a substring of two characters in common with the
+  query string. If that condition is true, then the directories will also add to the
+  score, although with a smaller weight.
+
+  The similarity measure between query and PathSegment in index
+  works as follows:
+  For each character c in the query string:
+    - find the largest substring in the query which includes the character c and
+      is also included in the PathSegment
+    - take the lenght of that substring as score
+  sum up the scores for each character c and divide by (string length)^2
+  
+  For example, if query = "rngnomadriv" 
+  and candidate is "./drivers/char/hw_random/nomadik-rng.c", then scores are calculated
+  as follows:
+    rngnomadriv
+    33355555444 (subscores)
+    FFFFFFFFDDD (F=file component, D=dir component)
+    score1=(3+3+3+5+5+5+5+5+(4+4+4)*0.7)
+
+    In final score, give a small penalty for larger candidate filenames:
+    Divide main part of score with (query string length)^2 
+    and minor part by (query string length)*(candidate string length)
+    score = score1/(11*11)*0.97 + score1/(11*38)*0.03 = 0.342944
+
+  @param query String to search for inside the index
+  */
+
+  std::vector<std::pair<float, int>> findSimilar(std::string query, int minChars) {
+    CandMap fileCandMap;
+    CandMap dirCandMap;
+
+    // Find both files and directories that match the input query
+    addToCandMap(fileCandMap, query, filemaps);
+    addToCandMap(dirCandMap, query, dirmaps);
+
+    /* If parent dir of a file matches the input string add the scores of the direcotry to the
+     scores of the file */
+    mergeCandidateMaps(fileCandMap, dirCandMap);
+
+    // Set all candidate pointers to NULL so they won't mess up future searches
+    for (auto seg : segsToClean) {
+      seg->cand = NULL;
+    }
+    segsToClean.clear();
+
+    // Form return result, 2d array with file id's and scores
+    std::vector<std::pair<float, int>> results;
+    for (auto &[fid, cand] : fileCandMap) {
+      std::pair<float, int> v;
+      float sc = cand.getScore();
+      v.first = sc;
+      v.second = fid;
+      results.push_back(v);
+    }
+    // Sort highest score first
+    std::sort(results.begin(), results.end(),
+              [](std::pair<float, int> a, std::pair<float, int> b) { return a.first > b.first; });
+    return results;
+  }
+
+  // Return int64_t representation of the first nchars in str, starting from index i
+  int64_t getKeyAtIdx(std::string str, int i, int nchars) {
+    int64_t key = 0;
+    for (int i_char = 0; i_char < nchars; i_char++) {
+      key = key | static_cast<int>(str[i + i_char]);
+      if (i_char < nchars - 1) {
+        // Shift 8 bits to the left except on the last iteration
+        key = key << 8;
+      }
+    }
+    return key;
+  }
+
+  void debug() {
+
+    int nchars = 3;
+    for (const auto &[key, value] : (*filemaps[nchars])) {
+      int64_t x;
+      x = key;
+      int multip = nchars * 8;
+      for (int i = 0; i <= nchars; i++) {
+        char c = (x >> multip) & 255;
+        std::cout << c;
+        multip -= 8;
+      }
+      std::cout << "\n";
+      // for (auto y : *value) {
+      // std::cout << y << " ";
+      // }
+      // std::cout << "\n";
+    }
+  }
+
+private:
   void clearPathSegmentChildren(PathSegment *p) {
     if (p->children.size() > 0) {
       for (auto x : p->children) {
@@ -248,47 +422,6 @@ public:
     }
   }
 
-  void addStrToIndex(std::string filePath, int fileId, const char &separator) {
-    // Split path to segments
-    auto segs = splitString(filePath, separator);
-    PathSegment *prev = NULL;
-    prev = root;
-    // Add segments to a tree type data structure
-    // e.g. addStrToIndex('/foo/bar/file1.txt' ..)
-    //      addStrToIndex('/foo/faa/file2.txt' ..)
-    // forms structure:
-    // root -> foo |-> bar -> file1,txt
-    //             |-> faa -> file2.txt
-    for (auto _x = segs.begin(); _x != segs.end(); ++_x) {
-      auto x = *_x;
-      PathSegment *p;
-
-      auto it = prev->children.find(x);
-      // this part of the path already exists in the tree
-      if (it != prev->children.end()) {
-        p = it->second;
-      } else {
-        p = new PathSegment(x, fileId);
-        p->parent = prev;
-        // If this is last item in segs
-        if (_x == std::prev(segs.end())) {
-          // therefore, it is a file.
-          p->type = File;
-          seglist[fileId] = p;
-        } else {
-          p->type = Dir;
-          p->fileId = dirId;
-          // Files use user input Id. Directories need to have it generated
-          dirId++;
-        }
-        prev->children[x] = p;
-        addPathSegmentKeys(p);
-      }
-
-      prev = p;
-    }
-  }
-
   // Find pathsegments from <map> that include the substring of <str> which starts at index <i> and
   // is of length <nchars>.
   std::vector<PathSegment *> findSimilarForNgram(std::string str, int i, int nchars, SegMap &map) {
@@ -337,7 +470,6 @@ public:
   // Add parent directories scores to files
   void mergeCandidateMaps(CandMap &fileCandMap, CandMap &dirCandMap) {
 
-    float dirMultip = 0.7; // Give only 70% of score if match is for directory
     for (auto &[fid, cand] : fileCandMap) {
       PathSegment *p = cand.seg->parent;
       while (p->parent != NULL) {
@@ -345,103 +477,14 @@ public:
           auto &scoreA = cand.v_charscore;
           auto &scoreB = p->cand->v_charscore;
           for (int i = 0; i < cand.len; i++) {
-            if (scoreA[i] < scoreB[i] * dirMultip) {
-              scoreA[i] = scoreB[i] * dirMultip;
+            if (scoreA[i] < scoreB[i] * dirWeight) {
+              scoreA[i] = scoreB[i] * dirWeight;
             }
           }
         }
         p = p->parent;
       }
     }
-  }
-
-  void debug() {
-
-    int nchars = 3;
-    for (const auto &[key, value] : (*filemaps[nchars])) {
-      int64_t x;
-      x = key;
-      int multip = nchars * 8;
-      for (int i = 0; i <= nchars; i++) {
-        char c = (x >> multip) & 255;
-        std::cout << c;
-        multip -= 8;
-      }
-      std::cout << "\n";
-      // for (auto y : *value) {
-        // std::cout << y << " ";
-      // }
-      // std::cout << "\n";
-    }
-  }
-
-  vector<pair<float, int>> findSimilar(std::string query, int minChars) {
-    CandMap fileCandMap;
-    CandMap dirCandMap;
-
-    /* The search will find filepaths similar to the input string
-
-    To be considered a candidate path, the file component of the path (e.g. file.txt)
-    is required to have at least a substring of two characters in common with the
-    query string.
-
-                If that condition is true, then the directories will also add to the score,
-                although with a smaller weight. */
-
-    // The similarity measure between query and PathSegment in index
-    // works (somewhat simplified) as follows:
-    // For each character c in the query string:
-    //   - find the largest substring in the query which includes the character c and
-    //     is also included in the PathSegment
-    //   - take the lenght of that substring as score
-    // sum up these values and divide by (string length)^2
-    // e.g.
-    // query = "loopeventsr"
-    // candidate = "/src/event-loop.c"
-    //          loopeventsr
-    // scores = 44445555522
-    // final score = (4+4+4+4+5+5+5+5+5+2+2)/(11*11) = 0.37
-
-    // Find both files and directories that match the input query
-    addToCandMap(fileCandMap, query, filemaps);
-    addToCandMap(dirCandMap, query, dirmaps);
-
-    /* If parent dir of a file matches the input string add the scores of the direcotry to the
-     scores of the file */
-    mergeCandidateMaps(fileCandMap, dirCandMap);
-
-    // Set all candidate pointers to NULL so they won't mess up future searches
-    for (auto seg : segsToClean) {
-      seg->cand = NULL;
-    }
-    segsToClean.clear();
-
-    // Form return result, 2d array with file id's and scores
-    vector<pair<float, int>> results;
-    for (auto &[fid, cand] : fileCandMap) {
-      pair<float, int> v;
-      float sc = cand.getScore();
-      v.first = sc;
-      v.second = fid;
-      results.push_back(v);
-    }
-    // Sort highest score first
-    std::sort(results.begin(), results.end(),
-              [](pair<float, int> a, pair<float, int> b) { return a.first > b.first; });
-    return results;
-  }
-
-  // Return int64_t representation of the first nchars in str, starting from index i
-  int64_t getKeyAtIdx(std::string str, int i, int nchars) {
-    int64_t key = 0;
-    for (int i_char = 0; i_char < nchars; i_char++) {
-      key = key | static_cast<int>(str[i + i_char]);
-      if (i_char < nchars - 1) {
-        // Shift 8 bits to the left except on the last iteration
-        key = key << 8;
-      }
-    }
-    return key;
   }
 
   void addToResults(PathSegment *seg, std::string str, int i, int nchars, CandMap &candmap) {

@@ -6,6 +6,10 @@
 #include <string>
 #include <chrono>
 
+using std::cout;
+using std::pair;
+using std::vector;
+
 std::vector<std::string> readLinesFromFile(const std::string &filename) {
   std::vector<std::string> lines;
   std::ifstream file(filename);
@@ -29,47 +33,44 @@ int main() {
   // idx.addStrToIndex("./gdk/x11/gdksettings.c", 1, '/');
   // idx.addStrToIndex("./gdk/x11/gdkx11devicemanager-xi2.h", 2, '/');
 
-  std::string filename = "flist.txt";
-  std::vector<std::string> lines = readLinesFromFile(filename);
+  // Add the file paths of 89828 files in linux-6.9-rc6 to the index
+  std::string fn_filePaths = "flist.txt";
+  std::vector<std::string> v_filePaths = readLinesFromFile(fn_filePaths);
 
   auto start = std::chrono::high_resolution_clock::now();
   int id = 0;
-  for (const auto &line : lines) {
-    idx.addStrToIndex(line, id, '/');
+  for (const auto &filePath : v_filePaths) {
+    idx.addStrToIndex(filePath, id, '/' /*dir separator*/);
+    // idx.addStrToIndex(filePath, id, '\0' /*dir separator*/);
     id++;
   }
+  
   auto idx_time = std::chrono::high_resolution_clock::now();
   std::chrono::duration<double, std::milli> duration = idx_time - start;
-  cout << "Indexing creation time (seconds): " << duration.count() / 1000 << "\n";
+  cout << "Indexing creation time for " << v_filePaths.size() << " file paths (seconds): " << duration.count() / 1000 << "\n";
 
+  // Find matching filepaths from the index for the query string "rngnomadriv"
   start = std::chrono::high_resolution_clock::now();
   std::string query = "rngnomadriv";
   const vector<pair<float, int>> &results = idx.findSimilar(query, 2);
   auto search_time = std::chrono::high_resolution_clock::now();
   duration = search_time - start;
-  cout << "Search time (seconds): " << duration.count() / 1000 << "\n";
-  
+  cout << "Search time (seconds): " << duration.count() / 1000
+       << "\n";
+
   int i = 0;
   std::cout << "query string: " << query << "\n";
   std::cout << "Top 20 matches:\n";
   for (const auto &res : results) {
-    std::cout << res.second << " " << res.first << " " << lines[res.second] << "\n";
+    std::cout << res.second << " " << res.first << " " << v_filePaths[res.second] << "\n";
     i++;
     if (i > 20) {
       break;
     }
   }
 
-  // Top 20 matches:
-  // 56383 0.329053 ./drivers/char/hw_random/nomadik-rng.c
-  // 65420 0.26059 ./drivers/pinctrl/nomadik
-  // 59594 0.255016 ./drivers/clocksource/nomadik-mtu.c
-  // 58689 0.255016 ./drivers/clk/clk-nomadik.c
-  // 47837 0.255016 ./drivers/i2c/busses/i2c-nomadik.c
-  // 55819 0.254551 ./drivers/gpio/gpio-nomadik.c
-  // ...
-
   return 0;
 }
 
+// Compile:
 // g++  -Wall -Wno-unused-variable -O3 -fopenmp -lstdc++ demo.cpp -o demo

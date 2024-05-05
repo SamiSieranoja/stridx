@@ -3,7 +3,7 @@
 #include "ruby/ruby.h"
 #include "ruby/thread.h"
 
-#include "stridx.hpp"
+#include "../stridx.hpp"
 
 extern "C" {
 
@@ -50,7 +50,7 @@ VALUE StringIndexFind(VALUE self, VALUE str, VALUE minChars) {
   StringIndex *idx = (StringIndex *)data;
 
   ret = rb_ary_new();
-  const vector<pair<float, int>> &results = idx->findSimilar(s1, NUM2INT(minChars));
+  const std::vector<std::pair<float, int>> &results = idx->findSimilar(s1, NUM2INT(minChars));
   int limit = 15;
   int i = 0;
   for (const auto &res : results) {

@@ -41,7 +41,7 @@ VALUE StringIndexAddSegments(VALUE self, VALUE str, VALUE fileId) {
   return self;
 }
 
-VALUE StringIndexFind(VALUE self, VALUE str, VALUE minChars) {
+VALUE StringIndexFind(VALUE self, VALUE str) {
   VALUE ret;
   std::string s1 = StringValueCStr(str);
 
@@ -50,7 +50,7 @@ VALUE StringIndexFind(VALUE self, VALUE str, VALUE minChars) {
   StringIndex *idx = (StringIndex *)data;
 
   ret = rb_ary_new();
-  const std::vector<std::pair<float, int>> &results = idx->findSimilar(s1, NUM2INT(minChars));
+  const std::vector<std::pair<float, int>> &results = idx->findSimilar(s1, 2);
   int limit = 15;
   int i = 0;
   for (const auto &res : results) {
@@ -68,12 +68,12 @@ VALUE StringIndexFind(VALUE self, VALUE str, VALUE minChars) {
 
 void Init_stridx(void) {
 
-  VALUE cFoo = rb_define_class("CppStringIndex", rb_cObject);
+  VALUE mStrIdx = rb_define_module("StrIdx");
+  VALUE classStringIndex = rb_define_class_under(mStrIdx, "StringIndex", rb_cObject);
 
-  rb_define_alloc_func(cFoo, str_idx_alloc);
-  rb_define_method(cFoo, "add", StringIndexAddSegments, 2);
-  rb_define_method(cFoo, "find", StringIndexFind, 2);
+  rb_define_alloc_func(classStringIndex, str_idx_alloc);
+  rb_define_method(classStringIndex, "add", StringIndexAddSegments, 2);
+  rb_define_method(classStringIndex, "find", StringIndexFind, 1);
 }
 
 } // End extern "C"
-

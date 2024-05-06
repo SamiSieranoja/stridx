@@ -36,7 +36,7 @@ VALUE StringIndexAddSegments(VALUE self, VALUE str, VALUE fileId) {
 
   void *data;
   TypedData_Get_Struct(self, int, &str_idx_type, data);
-  ((StringIndex *)data)->addStrToIndex(s1, fid, '/');
+  ((StringIndex *)data)->addStrToIndex(s1, fid);
 
   return self;
 }
@@ -66,6 +66,26 @@ VALUE StringIndexFind(VALUE self, VALUE str) {
   return ret;
 }
 
+VALUE StringIndexSetDirSeparator(VALUE self, VALUE str) {
+  char c = '/';
+  if (TYPE(str) == T_STRING) {
+    std::string s = StringValueCStr(str);
+    if (s.size() >= 1) {
+      c = s[0];
+    }
+  } else {
+    c = '\0'; // No separator
+    // if (TYPE(obj) == T_NIL)
+  }
+
+  void *data;
+  TypedData_Get_Struct(self, int, &str_idx_type, data);
+  StringIndex *idx = (StringIndex *)data;
+  idx->setDirSeparator(c);
+
+  return self;
+}
+
 void Init_stridx(void) {
 
   VALUE mStrIdx = rb_define_module("StrIdx");
@@ -74,6 +94,7 @@ void Init_stridx(void) {
   rb_define_alloc_func(classStringIndex, str_idx_alloc);
   rb_define_method(classStringIndex, "add", StringIndexAddSegments, 2);
   rb_define_method(classStringIndex, "find", StringIndexFind, 1);
+  rb_define_method(classStringIndex, "setDirSeparator", StringIndexSetDirSeparator, 1);
 }
 
 } // End extern "C"

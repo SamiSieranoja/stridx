@@ -214,7 +214,7 @@ public:
   }
 
   /**
-   * Add a string to the index to be search for afterwards
+   * Add a string to the index to be searched for afterwards
    *
    * @param filePath String to index (e.g. /home/user/Project/main.cpp).
    * @param fileId Unique identifier for filePath. Will be return as result from findSimilar.
@@ -272,7 +272,7 @@ public:
   }
 
   /**
-  * The search will find filepaths similar to the input string
+  The search will find filepaths similar to the input string
 
   To be considered a candidate path, the file component of the path (e.g. file.txt)
   is required to have at least a substring of two characters in common with the
@@ -286,8 +286,8 @@ public:
       is also included in the PathSegment
     - take the lenght of that substring as score
   sum up the scores for each character c and divide by (string length)^2
-  
-  For example, if query = "rngnomadriv" 
+
+  For example, if query = "rngnomadriv"
   and candidate is "./drivers/char/hw_random/nomadik-rng.c", then scores are calculated
   as follows:
     rngnomadriv
@@ -296,7 +296,7 @@ public:
     score1=(3+3+3+5+5+5+5+5+(4+4+4)*0.7)
 
     In final score, give a small penalty for larger candidate filenames:
-    Divide main part of score with (query string length)^2 
+    Divide main part of score with (query string length)^2
     and minor part by (query string length)*(candidate string length)
     score = score1/(11*11)*0.97 + score1/(11*38)*0.03 = 0.342944
 

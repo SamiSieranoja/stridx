@@ -303,6 +303,10 @@ public:
   @param query String to search for inside the index
   */
 
+  std::vector<std::pair<float, int>> findSimilar(std::string query) {
+    return findSimilar(query, 2);
+  }
+
   std::vector<std::pair<float, int>> findSimilar(std::string query, int minChars) {
     CandMap fileCandMap;
     CandMap dirCandMap;

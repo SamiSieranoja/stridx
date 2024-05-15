@@ -43,6 +43,15 @@ Install:
 gem install StrIdx
 ```
 
+Or, for development version:
+```
+git clone https://github.com/SamiSieranoja/stridx.git
+cd stridx
+cd rubyext;  ruby extconf.rb ; make ; cd ..
+gem build stridx.gemspec
+gem install $(ls -1tr StrIdx*gem | tail -n 1)
+```
+
 Usage example (see test.rb):
 ```ruby
 require "stridx"
@@ -58,7 +67,7 @@ for x in lines
 end
 
 idx_time = Time.new 
-puts "\nIndexing time (#{lines.size} files}): #{(idx_time - t).round(4)} seconds"
+puts "\nIndexing time (#{lines.size} files): #{(idx_time - t).round(4)} seconds"
 
 query = "rngnomadriv"
 res = idx.find(query)

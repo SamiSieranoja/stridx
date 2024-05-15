@@ -152,7 +152,8 @@ public:
 typedef ankerl::unordered_dense::map<int64_t, std::set<PathSegment *> *> SegMap;
 // typedef std::unordered_map<int64_t, std::set<PathSegment *> *> SegMap;
 
-typedef std::unordered_map<float, Candidate> CandMap;
+typedef ankerl::unordered_dense::map<int, Candidate *> CandMap;
+// typedef std::unordered_map<int, Candidate*> CandMap;
 
 class StringIndex {
 private:
@@ -329,11 +330,17 @@ public:
     std::vector<std::pair<float, int>> results;
     for (auto &[fid, cand] : fileCandMap) {
       std::pair<float, int> v;
-      float sc = cand.getScore();
+      float sc = cand->getScore();
       v.first = sc;
       v.second = fid;
       results.push_back(v);
+      delete cand;
     }
+
+    for (auto &[fid, cand] : dirCandMap) {
+      delete cand;
+    }
+
     // Sort highest score first
     std::sort(results.begin(), results.end(),
               [](std::pair<float, int> a, std::pair<float, int> b) { return a.first > b.first; });
@@ -475,12 +482,12 @@ private:
   void mergeCandidateMaps(CandMap &fileCandMap, CandMap &dirCandMap) {
 
     for (auto &[fid, cand] : fileCandMap) {
-      PathSegment *p = cand.seg->parent;
+      PathSegment *p = cand->seg->parent;
       while (p->parent != NULL) {
         if (p->cand != NULL) {
-          auto &scoreA = cand.v_charscore;
+          auto &scoreA = cand->v_charscore;
           auto &scoreB = p->cand->v_charscore;
-          for (int i = 0; i < cand.len; i++) {
+          for (int i = 0; i < cand->len; i++) {
             if (scoreA[i] < scoreB[i] * dirWeight) {
               scoreA[i] = scoreB[i] * dirWeight;
             }
@@ -495,15 +502,16 @@ private:
 
     auto it2 = candmap.find(seg->fileId);
     if (it2 == candmap.end()) {
-      Candidate cand(seg, str.size());
-      seg->cand = &(candmap[seg->fileId]);
+      Candidate *cand = new Candidate(seg, str.size());
+      seg->cand = candmap[seg->fileId];
       segsToClean.push_back(seg);
       candmap[seg->fileId] = cand;
     }
 
     for (int j = i; j < i + nchars; j++) {
-      if (candmap[seg->fileId][j] < nchars) {
-        candmap[seg->fileId].v_charscore[j] = nchars;
+      Candidate &cand = *(candmap[seg->fileId]);
+      if (cand[j] < nchars) {
+        cand.v_charscore[j] = nchars;
       }
     }
   }

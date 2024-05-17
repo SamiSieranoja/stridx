@@ -13,7 +13,13 @@ for x in lines
 end
 
 idx_time = Time.new 
-puts "\nIndexing time (#{lines.size} files}): #{(idx_time - t).round(4)} seconds"
+# Time to start the threadpool to process indexing
+puts "\nIndexing launch time (#{lines.size} files}): #{(idx_time - t).round(4)} seconds"
+
+idx.waitUntilDone() # Not necessary, will be called by idx.find
+idx_time = Time.new 
+# Time when all threads have completed
+puts "\nIndexing completed time (#{lines.size} files}): #{(idx_time - t).round(4)} seconds"
 
 query = "rngnomadriv"
 res = idx.find(query)

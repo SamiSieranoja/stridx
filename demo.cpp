@@ -1,3 +1,12 @@
+
+#include <condition_variable>
+#include <functional>
+#include <iostream>
+#include <mutex>
+#include <queue>
+#include <thread>
+#include <algorithm>
+
 #include "stridx.hpp"
 
 #include <iostream>
@@ -37,26 +46,39 @@ int main() {
   std::string fn_filePaths = "flist.txt";
   std::vector<std::string> v_filePaths = readLinesFromFile(fn_filePaths);
 
+	// Launch indexing to be run on background
+  cout << "File paths: " << v_filePaths.size() << std::endl;
+  cout << "Start indexing in the background" << std::endl;
   auto start = std::chrono::high_resolution_clock::now();
   int id = 0;
   for (const auto &filePath : v_filePaths) {
-    idx.addStrToIndex(filePath, id, '/' /*dir separator*/);
-    // idx.addStrToIndex(filePath, id, '\0' /*dir separator*/);
+    idx.addStrToIndexThreaded(filePath, id);
     id++;
   }
-  
+
+  auto idx_time_launch = std::chrono::high_resolution_clock::now();
+  std::chrono::duration<double, std::milli> duration_launch = idx_time_launch - start;
+  cout << "Indexing launch time (seconds): " << duration_launch.count() / 1000 << "\n";
+
+	// Wait until indexing has finished
+  idx.waitUntilDone();
+
   auto idx_time = std::chrono::high_resolution_clock::now();
   std::chrono::duration<double, std::milli> duration = idx_time - start;
-  cout << "Indexing creation time for " << v_filePaths.size() << " file paths (seconds): " << duration.count() / 1000 << "\n";
+  cout << "Indexing finished time for " << v_filePaths.size()
+       << " file paths (seconds): " << duration.count() / 1000 << "\n";
 
   // Find matching filepaths from the index for the query string "rngnomadriv"
   start = std::chrono::high_resolution_clock::now();
   std::string query = "rngnomadriv";
+  for (int i = 0; i < 99; i++) {
+    const vector<pair<float, int>> &results = idx.findSimilar(query, 2);
+  }
+
   const vector<pair<float, int>> &results = idx.findSimilar(query, 2);
   auto search_time = std::chrono::high_resolution_clock::now();
   duration = search_time - start;
-  cout << "Search time (seconds): " << duration.count() / 1000
-       << "\n";
+  cout << "Search time for 100 queries (seconds): " << duration.count() / 1000 << "\n";
 
   int i = 0;
   std::cout << "query string: " << query << "\n";
@@ -73,4 +95,4 @@ int main() {
 }
 
 // Compile:
-// g++  -Wall -Wno-unused-variable -O3 -fopenmp -lstdc++ demo.cpp -o demo
+// g++  -Wall -Wno-unused-variable -O3 -lstdc++ demo.cpp -o demo

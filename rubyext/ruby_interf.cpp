@@ -36,10 +36,19 @@ VALUE StringIndexAddSegments(VALUE self, VALUE str, VALUE fileId) {
 
   void *data;
   TypedData_Get_Struct(self, int, &str_idx_type, data);
-  ((StringIndex *)data)->addStrToIndex(s1, fid);
+  // ((StringIndex *)data)->addStrToIndex(s1, fid);
+  ((StringIndex *)data)->addStrToIndexThreaded(s1, fid);
 
   return self;
 }
+
+VALUE StringIndexWaitUntilDone(VALUE self) {
+  void *data;
+  TypedData_Get_Struct(self, int, &str_idx_type, data);
+  ((StringIndex *)data)->waitUntilDone();
+  return self;
+}
+  
 
 VALUE StringIndexFind(VALUE self, VALUE str) {
   VALUE ret;
@@ -93,8 +102,12 @@ void Init_stridx(void) {
 
   rb_define_alloc_func(classStringIndex, str_idx_alloc);
   rb_define_method(classStringIndex, "add", StringIndexAddSegments, 2);
+  rb_define_method(classStringIndex, "waitUntilDone", StringIndexWaitUntilDone, 0);
   rb_define_method(classStringIndex, "find", StringIndexFind, 1);
+  
   rb_define_method(classStringIndex, "setDirSeparator", StringIndexSetDirSeparator, 1);
+  
+  
 }
 
 } // End extern "C"

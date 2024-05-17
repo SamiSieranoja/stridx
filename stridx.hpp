@@ -4,16 +4,18 @@
 #include <cassert>
 
 #include <vector>
+#include <array>
 #include <iostream>
 #include <unordered_map>
 #include <set>
 #include <algorithm>
 #include <sstream>
 
-#ifdef _OPENMP
-#include <omp.h>
-#endif
+#include <vector>
+#include <mutex>
+#include <thread>
 
+#include "thread_pool.hpp"
 #include "unordered_dense.h"
 
 // Transforms input string as follows:
@@ -81,6 +83,7 @@ public:
   int fileId; // (if FILE)
   Candidate *cand;
   PathSegment *parent;
+  std::mutex mu;
   ankerl::unordered_dense::map<std::string, PathSegment *> children;
   segmentType type = Dir;
   PathSegment() : parent(NULL) {}
@@ -159,6 +162,7 @@ class StringIndex {
 private:
   int tmp;
   char dirSeparator = '/'; // Usually '/', '\' or '\0' (no separator)
+  int numStrings = 0;
 
   std::vector<SegMap *> dirmaps;
   std::vector<SegMap *> filemaps;
@@ -171,6 +175,12 @@ private:
   int dirId = 0;
   float dirWeight = 0.7; // Give only 70% of score if match is for a directory
 
+  std::array<std::mutex, 9> mts;
+  std::array<std::mutex, 9> mts_f;
+  std::array<std::mutex, 9> mts_d;
+
+  ThreadPool *pool;
+
 public:
   StringIndex() {
     root = new PathSegment();
@@ -182,9 +192,12 @@ public:
       filemaps.push_back(new SegMap);
     }
 
-#ifdef _OPENMP
-    std::cout << "OPENMP enabled\n";
-#endif
+    // Threads between 4 and 20
+    // We probably won't get any benefit from more than 20 threads even if the hardware supports it
+    int num_threads = std::max((int)std::thread::hardware_concurrency(), 4);
+    num_threads = std::min(num_threads, 20);
+    // std::cout << "Number of threads: " << num_threads << std::endl;
+    pool = new ThreadPool(num_threads);
   }
 
   void setDirSeparator(char sep) { dirSeparator = sep; }
@@ -208,11 +221,27 @@ public:
       delete x;
     }
     clearPathSegmentChildren(root);
+    delete pool;
   }
 
   void addStrToIndex(std::string filePath, int fileId) {
     addStrToIndex(filePath, fileId, dirSeparator);
   }
+
+  void addStrToIndexThreaded(std::string filePath, int fileId) {
+    pool->enqueue([=] { addStrToIndex(filePath, fileId, dirSeparator); });
+  }
+  void waitUntilReady() {
+    pool->waitUntilDone();
+    // std::cout << "size: " << numStrings << std::endl;
+  }
+
+  void waitUntilDone() {
+    pool->waitUntilDone();
+    // std::cout << "size: " << numStrings << std::endl;
+  }
+
+  // pool.waitUntilDone();
 
   /**
    * Add a string to the index to be searched for afterwards
@@ -223,8 +252,10 @@ public:
    * one of {'\\', '/', '\0' (no separation)}.
    */
   void addStrToIndex(std::string filePath, int fileId, const char &separator) {
+    // std::cout << filePath <<"," << fileId << "," << separator << std::endl;
 
     std::vector<std::string> segs;
+    numStrings += 1;
 
     if (separator == '\0') {
       // No separation to directories & files
@@ -246,10 +277,12 @@ public:
       auto x = *_x;
       PathSegment *p;
 
+      prev->mu.lock();
       auto it = prev->children.find(x);
       // this part of the path already exists in the tree
       if (it != prev->children.end()) {
         p = it->second;
+        prev->mu.unlock();
       } else {
         p = new PathSegment(x, fileId);
         p->parent = prev;
@@ -265,6 +298,7 @@ public:
           dirId++;
         }
         prev->children[x] = p;
+        prev->mu.unlock();
         addPathSegmentKeys(p);
       }
 
@@ -311,6 +345,8 @@ public:
   std::vector<std::pair<float, int>> findSimilar(std::string query, int minChars) {
     CandMap fileCandMap;
     CandMap dirCandMap;
+
+    waitUntilDone();
 
     // Find both files and directories that match the input query
     addToCandMap(fileCandMap, query, filemaps);
@@ -406,22 +442,29 @@ private:
       maxChars = p->str.size();
     }
 
-#ifdef _OPENMP
-#pragma omp parallel for
-#endif
     for (int sublen = minChars; sublen <= maxChars; sublen++) {
 
+      std::mutex *mu;
       SegMap *map;
       if (p->type == File) {
         map = filemaps[sublen];
+        mu = &mts_f[sublen];
       } else {
         map = dirmaps[sublen];
+        mu = &mts_d[sublen];
       }
 
       int count = str.size() - sublen + 1;
 
+      int64_t keys[count + 1];
       for (int i = 0; i <= count; i++) {
-        int64_t key = getKeyAtIdx(str, i, sublen);
+        keys[i] = getKeyAtIdx(str, i, sublen);
+      }
+
+      mu->lock();
+      for (int i = 0; i <= count; i++) {
+        // int64_t key = getKeyAtIdx(str, i, sublen);
+        auto key = keys[i];
 
         // Create a new std::set for key if doesn't exist already
         auto it = map->find(key);
@@ -430,6 +473,7 @@ private:
         }
         (*map)[key]->insert(p);
       }
+      mu->unlock();
     }
   }
 

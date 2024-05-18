@@ -86,15 +86,15 @@ public:
   std::mutex mu;
   ankerl::unordered_dense::map<std::string, PathSegment *> children;
   segmentType type = Dir;
-  PathSegment() : parent(NULL) {}
-  PathSegment(std::string _str) : str(_str), parent(NULL) {}
+  PathSegment() : parent(nullptr) {}
+  PathSegment(std::string _str) : str(_str), parent(nullptr) {}
   PathSegment(std::string _str, int _fileId)
-      : str(_str), fileId(_fileId), cand(NULL), parent(NULL) {}
+      : str(_str), fileId(_fileId), cand(nullptr), parent(nullptr) {}
   int size() {
     int sz = str.size();
     PathSegment *cur = parent;
     // Sum up length of parent segments (+1 for divisors)
-    while (cur->parent != NULL) {
+    while (cur->parent != nullptr) {
       sz += cur->str.size() + 1;
       cur = cur->parent;
     }
@@ -121,7 +121,7 @@ public:
     // Initialize v_charscores with zeros
     v_charscore.resize(len, 0);
     candLen = str.size();
-    seg = NULL;
+    seg = nullptr;
   }
 
   Candidate(PathSegment *_seg, int _len) : seg(_seg), len(_len) {
@@ -184,7 +184,7 @@ private:
 public:
   StringIndex() {
     root = new PathSegment();
-    root->parent = NULL;
+    root->parent = nullptr;
     root->str = "[ROOT]";
 
     for (int i = 0; i <= 8; i++) {
@@ -192,11 +192,11 @@ public:
       filemaps.push_back(new SegMap);
     }
 
-    // Threads between 4 and 20
-    // We probably won't get any benefit from more than 20 threads even if the hardware supports it
+    // Threads between 4 and 6
+    // We don't seem to get any benefit from more than 6 threads even if the hardware supports it
     int num_threads = std::max((int)std::thread::hardware_concurrency(), 4);
-    num_threads = std::min(num_threads, 20);
-    // std::cout << "Number of threads: " << num_threads << std::endl;
+    num_threads = std::min(num_threads, 6);
+    std::cout << "Number of threads: " << num_threads << std::endl;
     pool = new ThreadPool(num_threads);
   }
 
@@ -233,15 +233,11 @@ public:
   }
   void waitUntilReady() {
     pool->waitUntilDone();
-    // std::cout << "size: " << numStrings << std::endl;
   }
 
   void waitUntilDone() {
     pool->waitUntilDone();
-    // std::cout << "size: " << numStrings << std::endl;
   }
-
-  // pool.waitUntilDone();
 
   /**
    * Add a string to the index to be searched for afterwards
@@ -265,7 +261,7 @@ public:
       segs = splitString(filePath, separator);
     }
 
-    PathSegment *prev = NULL;
+    PathSegment *prev = nullptr;
     prev = root;
     // Add segments to a tree type data structure
     // e.g. addStrToIndex('/foo/bar/file1.txt' ..)
@@ -356,9 +352,9 @@ public:
      scores of the file */
     mergeCandidateMaps(fileCandMap, dirCandMap);
 
-    // Set all candidate pointers to NULL so they won't mess up future searches
+    // Set all candidate pointers to nullptr so they won't mess up future searches
     for (auto seg : segsToClean) {
-      seg->cand = NULL;
+      seg->cand = nullptr;
     }
     segsToClean.clear();
 
@@ -527,8 +523,8 @@ private:
 
     for (auto &[fid, cand] : fileCandMap) {
       PathSegment *p = cand->seg->parent;
-      while (p->parent != NULL) {
-        if (p->cand != NULL) {
+      while (p->parent != nullptr) {
+        if (p->cand != nullptr) {
           auto &scoreA = cand->v_charscore;
           auto &scoreB = p->cand->v_charscore;
           for (int i = 0; i < cand->len; i++) {

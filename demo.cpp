@@ -37,7 +37,7 @@ std::vector<std::string> readLinesFromFile(const std::string &filename) {
 }
 
 int main() {
-  StringIndex idx;
+  StrIdx::StringIndex idx;
   // idx.addStrToIndex("./gdk/x11/gdkasync.c", 0 /*id*/, '/' /*separator*/);
   // idx.addStrToIndex("./gdk/x11/gdksettings.c", 1, '/');
   // idx.addStrToIndex("./gdk/x11/gdkx11devicemanager-xi2.h", 2, '/');

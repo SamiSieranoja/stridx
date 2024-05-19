@@ -18,6 +18,8 @@
 #include "thread_pool.hpp"
 #include "unordered_dense.h"
 
+namespace StrIdx {
+
 // Transforms input string as follows:
 // '/foo/bar/file1.txt'
 // => vector{"foo", "bar", "file1.txt"}
@@ -72,7 +74,7 @@ std::string charToBinaryString(char num) {
 }
 
 class Candidate;
-enum segmentType { Dir, File };
+enum class segmentType { Dir, File };
 
 // A segment of a file path
 // e.g. if path is /foo/bar/baz.txt
@@ -85,7 +87,7 @@ public:
   PathSegment *parent;
   std::mutex mu;
   ankerl::unordered_dense::map<std::string, PathSegment *> children;
-  segmentType type = Dir;
+  segmentType type = segmentType::Dir;
   PathSegment() : parent(nullptr) {}
   PathSegment(std::string _str) : str(_str), parent(nullptr) {}
   PathSegment(std::string _str, int _fileId)
@@ -231,13 +233,9 @@ public:
   void addStrToIndexThreaded(std::string filePath, int fileId) {
     pool->enqueue([=] { addStrToIndex(filePath, fileId, dirSeparator); });
   }
-  void waitUntilReady() {
-    pool->waitUntilDone();
-  }
+  void waitUntilReady() { pool->waitUntilDone(); }
 
-  void waitUntilDone() {
-    pool->waitUntilDone();
-  }
+  void waitUntilDone() { pool->waitUntilDone(); }
 
   /**
    * Add a string to the index to be searched for afterwards
@@ -274,9 +272,9 @@ public:
       PathSegment *p;
 
       prev->mu.lock();
-      auto it = prev->children.find(x);
+      
       // this part of the path already exists in the tree
-      if (it != prev->children.end()) {
+      if (auto it = prev->children.find(x); it != prev->children.end()) {
         p = it->second;
         prev->mu.unlock();
       } else {
@@ -285,10 +283,10 @@ public:
         // If this is last item in segs
         if (_x == std::prev(segs.end())) {
           // therefore, it is a file.
-          p->type = File;
+          p->type = segmentType::File;
           seglist[fileId] = p;
         } else {
-          p->type = Dir;
+          p->type = segmentType::Dir;
           p->fileId = dirId;
           // Files use user input Id. Directories need to have it generated
           dirId++;
@@ -442,7 +440,7 @@ private:
 
       std::mutex *mu;
       SegMap *map;
-      if (p->type == File) {
+      if (p->type == segmentType::File) {
         map = filemaps[sublen];
         mu = &mts_f[sublen];
       } else {
@@ -484,8 +482,7 @@ private:
     // transform that to 64 bit integer
     int64_t key = getKeyAtIdx(str, i, nchars);
     // Find all path segments in map that have the same substring
-    auto it = map.find(key);
-    if (it != map.end()) { // key found
+    if (auto it = map.find(key); it != map.end()) { // key found
       auto set = it->second;
       for (auto value : *set) {
         res.push_back(value);
@@ -540,8 +537,8 @@ private:
 
   void addToResults(PathSegment *seg, std::string str, int i, int nchars, CandMap &candmap) {
 
-    auto it2 = candmap.find(seg->fileId);
-    if (it2 == candmap.end()) {
+    
+    if (auto it2 = candmap.find(seg->fileId); it2 == candmap.end()) {
       Candidate *cand = new Candidate(seg, str.size());
       seg->cand = candmap[seg->fileId];
       segsToClean.push_back(seg);
@@ -556,3 +553,5 @@ private:
     }
   }
 };
+
+} // namespace StrIdx

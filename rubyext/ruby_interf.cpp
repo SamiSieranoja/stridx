@@ -7,7 +7,7 @@
 
 extern "C" {
 
-void str_idx_free(void *data) { delete (StringIndex *)data; }
+void str_idx_free(void *data) { delete (StrIdx::StringIndex *)data; }
 
 // Wrap StringIndex class inside a ruby variable
 static const rb_data_type_t str_idx_type = {
@@ -26,7 +26,7 @@ static const rb_data_type_t str_idx_type = {
 };
 
 VALUE str_idx_alloc(VALUE self) {
-  void *data = new StringIndex();
+  void *data = new StrIdx::StringIndex();
   return TypedData_Wrap_Struct(self, &str_idx_type, data);
 }
 
@@ -37,7 +37,7 @@ VALUE StringIndexAddSegments(VALUE self, VALUE str, VALUE fileId) {
   void *data;
   TypedData_Get_Struct(self, int, &str_idx_type, data);
   // ((StringIndex *)data)->addStrToIndex(s1, fid);
-  ((StringIndex *)data)->addStrToIndexThreaded(s1, fid);
+  ((StrIdx::StringIndex *)data)->addStrToIndexThreaded(s1, fid);
 
   return self;
 }
@@ -45,7 +45,7 @@ VALUE StringIndexAddSegments(VALUE self, VALUE str, VALUE fileId) {
 VALUE StringIndexWaitUntilDone(VALUE self) {
   void *data;
   TypedData_Get_Struct(self, int, &str_idx_type, data);
-  ((StringIndex *)data)->waitUntilDone();
+  ((StrIdx::StringIndex *)data)->waitUntilDone();
   return self;
 }
   
@@ -56,7 +56,7 @@ VALUE StringIndexFind(VALUE self, VALUE str) {
 
   void *data;
   TypedData_Get_Struct(self, int, &str_idx_type, data);
-  StringIndex *idx = (StringIndex *)data;
+  StrIdx::StringIndex *idx = (StrIdx::StringIndex *)data;
 
   ret = rb_ary_new();
   const std::vector<std::pair<float, int>> &results = idx->findSimilar(s1, 2);
@@ -89,7 +89,7 @@ VALUE StringIndexSetDirSeparator(VALUE self, VALUE str) {
 
   void *data;
   TypedData_Get_Struct(self, int, &str_idx_type, data);
-  StringIndex *idx = (StringIndex *)data;
+  StrIdx::StringIndex *idx = (StrIdx::StringIndex *)data;
   idx->setDirSeparator(c);
 
   return self;

@@ -23,6 +23,44 @@
 
 namespace StrIdx {
 
+/* Alternative to using std::cout
+   Allows to control verbose level */
+class Output {
+private:
+  int verboseLevel;
+
+public:
+  Output(int verb) : verboseLevel(verb) {}
+  Output() : Output(3) {}
+  ~Output() = default;
+  void print() {}
+
+  // When calling as print("xxx ",3, " yyy") outputs "xxx 3 yyy"
+  template <typename T, typename... Types> void print(T var1, Types... var2) {
+    std::cout << var1;
+    print(var2...);
+  }
+
+  // When calling as printl("xxx ",3, " yyy") outputs "xxx 3 yyy\n"
+  template <typename... Types> void printl(Types... var2) {
+    print(var2...);
+    print("\n");
+  }
+
+  /* When calling as printv(2, "xxx ",3, " yyy") outputs "xxx 3 yyy\n"
+   * if verboseLevel >= 2 (first arg)
+   */
+  template <typename... Types> void printv(int vlevel, Types... var2) {
+    if (verboseLevel < vlevel) {
+      return;
+    }
+    if (verboseLevel >= 3) {
+      print("[v=", vlevel, "] ");
+    }
+    printl(var2...);
+  }
+};
+
 // Transforms input string as follows:
 // '/foo/bar/file1.txt'
 // => vector{"foo", "bar", "file1.txt"}
@@ -182,11 +220,11 @@ private:
   int dirId = 0;
   float dirWeight = 0.7; // Give only 70% of score if match is for a directory
 
-  std::array<std::mutex, 9> mts;
   std::array<std::mutex, 9> mts_f;
   std::array<std::mutex, 9> mts_d;
 
-  ThreadPool *pool;
+  std::unique_ptr<ThreadPool> pool;
+  Output out{1}; // verbose level = 2
 
 public:
   StringIndex() {
@@ -203,8 +241,8 @@ public:
     // We don't seem to get any benefit from more than 6 threads even if the hardware supports it
     int num_threads = std::max((int)std::thread::hardware_concurrency(), 4);
     num_threads = std::min(num_threads, 6);
-    std::cout << "Number of threads: " << num_threads << std::endl;
-    pool = new ThreadPool(num_threads);
+    out.printv(2, "Number of threads: ", num_threads);
+    pool = std::unique_ptr<ThreadPool>(new ThreadPool(num_threads));
   }
 
   void setDirSeparator(char sep) { dirSeparator = sep; }
@@ -228,7 +266,6 @@ public:
       delete x;
     }
     clearPathSegmentChildren(root);
-    delete pool;
   }
 
   void addStrToIndex(std::string filePath, int fileId) {
@@ -251,7 +288,7 @@ public:
    * one of {'\\', '/', '\0' (no separation)}.
    */
   void addStrToIndex(std::string filePath, int fileId, const char &separator) {
-    // std::cout << filePath <<"," << fileId << "," << separator << std::endl;
+    out.printv(3, "Add file:", filePath, ",", fileId, ",", separator);
 
     std::vector<std::string> segs;
     numStrings += 1;
@@ -277,7 +314,7 @@ public:
       PathSegment *p;
 
       prev->mu.lock();
-      
+
       // this part of the path already exists in the tree
       if (auto it = prev->children.find(x); it != prev->children.end()) {
         p = it->second;
@@ -285,12 +322,11 @@ public:
       } else {
         p = new PathSegment(x, fileId);
         p->parent = prev;
-        // If this is last item in segs
+        // If this is last item in segs, then it is a file.
         if (_x == std::prev(segs.end())) {
-          // therefore, it is a file.
           p->type = segmentType::File;
           seglist[fileId] = p;
-        } else {
+        } else { // otherwise, it is a directory
           p->type = segmentType::Dir;
           p->fileId = dirId;
           // Files use user input Id. Directories need to have it generated
@@ -542,7 +578,6 @@ private:
 
   void addToResults(PathSegment *seg, std::string str, int i, int nchars, CandMap &candmap) {
 
-    
     if (auto it2 = candmap.find(seg->fileId); it2 == candmap.end()) {
       Candidate *cand = new Candidate(seg, str.size());
       seg->cand = candmap[seg->fileId];
@@ -560,6 +595,5 @@ private:
 };
 
 } // namespace StrIdx
-
 
 #endif

@@ -1,4 +1,7 @@
 
+#ifndef SSSTRIDX_HPP
+#define SSSTRIDX_HPP
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <cassert>
@@ -46,7 +49,7 @@ std::string int64ToBinaryString(int64_t num) {
   return result;
 }
 
-// Convert a (8 char) string represented as int64_t to std::string
+// Debug. Convert a (8 char) string represented as int64_t to std::string
 std::string int64ToStr(int64_t key) {
   int nchars = 8;
   std::string str;
@@ -59,16 +62,18 @@ std::string int64ToStr(int64_t key) {
   return str;
 }
 
+// Debug
 void printVector(const std::vector<int> &vec) {
   for (const auto &value : vec) {
     std::cout << value << " ";
   }
 }
 
-std::string charToBinaryString(char num) {
+// Debug
+std::string charToBinaryString(char chr) {
   std::string result;
   for (int i = 7; i >= 0; --i) {
-    result += ((num >> i) & 1) ? '1' : '0';
+    result += ((chr >> i) & 1) ? '1' : '0';
   }
   return result;
 }
@@ -381,7 +386,7 @@ public:
   int64_t getKeyAtIdx(std::string str, int i, int nchars) {
     int64_t key = 0;
     for (int i_char = 0; i_char < nchars; i_char++) {
-      key = key | static_cast<int>(str[i + i_char]);
+      key = key | static_cast<int64_t>(str[i + i_char]);
       if (i_char < nchars - 1) {
         // Shift 8 bits to the left except on the last iteration
         key = key << 8;
@@ -555,3 +560,6 @@ private:
 };
 
 } // namespace StrIdx
+
+
+#endif

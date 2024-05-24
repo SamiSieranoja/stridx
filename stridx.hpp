@@ -79,7 +79,7 @@ std::vector<std::string> splitString(const std::string &input, const char &separ
 }
 
 // Convert int64_t to binary string
-std::string int64ToBinaryString(int64_t num) {
+[[nodiscard]] std::string int64ToBinaryString(int64_t num) {
   std::string result;
   for (int i = 63; i >= 0; --i) {
     result += ((num >> i) & 1) ? '1' : '0';
@@ -88,7 +88,7 @@ std::string int64ToBinaryString(int64_t num) {
 }
 
 // Debug. Convert a (8 char) string represented as int64_t to std::string
-std::string int64ToStr(int64_t key) {
+[[nodiscard]] std::string int64ToStr(int64_t key) {
   int nchars = 8;
   std::string str;
   int multip = nchars * 8;
@@ -108,7 +108,7 @@ void printVector(const std::vector<int> &vec) {
 }
 
 // Debug
-std::string charToBinaryString(char chr) {
+[[nodiscard]] std::string charToBinaryString(char chr) {
   std::string result;
   for (int i = 7; i >= 0; --i) {
     result += ((chr >> i) & 1) ? '1' : '0';
@@ -135,7 +135,7 @@ public:
   PathSegment(std::string _str) : str(_str), parent(nullptr) {}
   PathSegment(std::string _str, int _fileId)
       : str(_str), fileId(_fileId), cand(nullptr), parent(nullptr) {}
-  int size() {
+  [[nodiscard]] int size() {
     int sz = str.size();
     PathSegment *cur = parent;
     // Sum up length of parent segments (+1 for divisors)
@@ -175,7 +175,7 @@ public:
     candLen = seg->size();
   }
 
-  float getScore() {
+  [[nodiscard]] float getScore() {
     int i = 0;
     float score = 0.0;
     candLen = seg->size();
@@ -193,7 +193,7 @@ public:
     return score;
   }
 
-  float operator[](int idx) { return v_charscore[idx]; }
+  [[nodiscard]] float operator[](int idx) { return v_charscore[idx]; }
 };
 
 // This seems to give 10x speed improvement over std::unordered_map
@@ -224,10 +224,10 @@ private:
   std::array<std::mutex, 9> mts_d;
 
   std::unique_ptr<ThreadPool> pool;
-  Output out{1}; // verbose level = 2
+  Output out{1}; // verbose level = 1
 
 public:
-  StringIndex() {
+  StringIndex(char sep) : dirSeparator(sep) {
     root = new PathSegment();
     root->parent = nullptr;
     root->str = "[ROOT]";
@@ -244,6 +244,10 @@ public:
     out.printv(2, "Number of threads: ", num_threads);
     pool = std::unique_ptr<ThreadPool>(new ThreadPool(num_threads));
   }
+
+  /* Don't separate path to segments separator=\0.
+     This is slower, but can be used for other data than files also.  */
+  StringIndex() : StringIndex('\0') {}
 
   void setDirSeparator(char sep) { dirSeparator = sep; }
   void setDirWeight(float val) { dirWeight = val; }
@@ -373,11 +377,11 @@ public:
   @param query String to search for inside the index
   */
 
-  std::vector<std::pair<float, int>> findSimilar(std::string query) {
+  [[nodiscard]] std::vector<std::pair<float, int>> findSimilar(std::string query) {
     return findSimilar(query, 2);
   }
 
-  std::vector<std::pair<float, int>> findSimilar(std::string query, int minChars) {
+  [[nodiscard]] std::vector<std::pair<float, int>> findSimilar(std::string query, int minChars) {
     CandMap fileCandMap;
     CandMap dirCandMap;
 
@@ -419,7 +423,7 @@ public:
   }
 
   // Return int64_t representation of the first nchars in str, starting from index i
-  int64_t getKeyAtIdx(std::string str, int i, int nchars) {
+  [[nodiscard]] int64_t getKeyAtIdx(std::string str, int i, int nchars) {
     int64_t key = 0;
     for (int i_char = 0; i_char < nchars; i_char++) {
       key = key | static_cast<int64_t>(str[i + i_char]);
@@ -514,7 +518,8 @@ private:
 
   // Find pathsegments from <map> that include the substring of <str> which starts at index <i> and
   // is of length <nchars>.
-  std::vector<PathSegment *> findSimilarForNgram(std::string str, int i, int nchars, SegMap &map) {
+  [[nodiscard]] std::vector<PathSegment *> findSimilarForNgram(std::string str, int i, int nchars,
+                                                               SegMap &map) {
 
     assert(i + nchars <= static_cast<int>(str.size()));
     std::vector<PathSegment *> res;
@@ -580,9 +585,9 @@ private:
 
     if (auto it2 = candmap.find(seg->fileId); it2 == candmap.end()) {
       Candidate *cand = new Candidate(seg, str.size());
-      seg->cand = candmap[seg->fileId];
       segsToClean.push_back(seg);
       candmap[seg->fileId] = cand;
+      seg->cand = cand;
     }
 
     for (int j = i; j < i + nchars; j++) {

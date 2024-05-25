@@ -2,6 +2,7 @@
 #include <gtest/gtest.h>
 #include "stridx.hpp"
 #include <cmath>
+#include <memory>
 
 TEST(SplitString, MatchSize) {
   std::vector<std::string> svec = StrIdx::splitString("foo/bar/test1.txt", '/');
@@ -64,23 +65,57 @@ void scoreTest(bool threaded) {
 TEST(IndexSearch, MatchingScoresSingleThread) { scoreTest(false); }
 TEST(IndexSearch, MatchingScoresThreaded) { scoreTest(true); }
 
-TEST(IndexSearch, BinaryRepresentation) {
+class IndexTest : public testing::Test {
+protected:
+  // unique_ptr<StrIdx::StringIndex> idx StrIdx::StringIndex idx{'/'};
+  // auto idx = std::make_unique<StrIdx::StringIndex>('/');
+  std::unique_ptr<StrIdx::StringIndex> idx = std::make_unique<StrIdx::StringIndex>('/');
 
-  auto idx = StrIdx::StringIndex();
-  {
-    int64_t num = idx.getKeyAtIdx("abcdefgh", 0, 8);
-    std::string s = StrIdx::int64ToBinaryString(num);
-    EXPECT_TRUE(s == "0110000101100010011000110110010001100101011001100110011101101000");
+  IndexTest() {}
+
+  void SetUp() override {
+    // Code here will be called immediately after the constructor (right
+    // before each test).
+    idx = std::make_unique<StrIdx::StringIndex>('/');
   }
 
-  {
-    int64_t num = idx.getKeyAtIdx("abcdefgh", 0, 1);
-    std::string s = StrIdx::int64ToBinaryString(num);
-    EXPECT_TRUE(s == "0000000000000000000000000000000000000000000000000000000001100001");
+  void TearDown() override {
+    // Code here will be called immediately after each test (right
+    // before the destructor).
   }
-  {
-    int64_t num = idx.getKeyAtIdx("abcdefgh", 7, 1);
-    std::string s = StrIdx::int64ToBinaryString(num);
-    EXPECT_TRUE(s == "0000000000000000000000000000000000000000000000000000000001101000");
-  }
+};
+
+TEST_F(IndexTest, BinaryRepresentation1) {
+  int64_t num = idx->getKeyAtIdx("abcdefgh", 0, 8);
+  std::string s = StrIdx::int64ToBinaryString(num);
+  //                a       b       c       d ...
+  EXPECT_TRUE(s == "0110000101100010011000110110010001100101011001100110011101101000");
+}
+
+TEST_F(IndexTest, BinaryRepresentation2) {
+  int64_t num = idx->getKeyAtIdx("abcdefgh", 0, 1);
+  std::string s = StrIdx::int64ToBinaryString(num);
+  EXPECT_TRUE(
+      s == "0000000000000000000000000000000000000000000000000000000001100001"); // 01100001 == "a"
+}
+TEST_F(IndexTest, BinaryRepresentation3) {
+  int64_t num = idx->getKeyAtIdx("abcdefgh", 7, 1);
+  std::string s = StrIdx::int64ToBinaryString(num);
+  EXPECT_TRUE(
+      s == "0000000000000000000000000000000000000000000000000000000001101000"); // 01101000 == "h"
+}
+
+TEST_F(IndexTest, Size1) {
+  idx->addStrToIndex("./drivers/i2c/busses/i2c-nomadik.c", 0);
+  idx->addStrToIndex("./drivers/i2c/busses/i2c-nomadiksdf.c", 0);
+  idx->addStrToIndex("./drivers/i2c/busses/i2c-nomadik.c", 1);
+  idx->addStrToIndex("./drivers/i2c/busses/i2c-nomadik.c", 2);
+  EXPECT_EQ(idx->size(), 1);
+}
+
+TEST_F(IndexTest, Size2) {
+  idx->addStrToIndex("./drivers/i2c/busses/i2c-nomadik.c", 22);
+  idx->addStrToIndex("./Documentation/devicetree/bindings/arm/ste-nomadik.txt", 1);
+  idx->addStrToIndex("./Documentation/devicetree/bindings/arm/ste-nomadik33.txt", 3);
+  EXPECT_EQ(idx->size(), 3);
 }

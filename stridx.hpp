@@ -214,7 +214,6 @@ private:
 
   std::vector<PathSegment *> segsToClean;
 
-  std::unordered_map<int, std::string> strlist;
   std::unordered_map<int, PathSegment *> seglist;
   PathSegment *root;
   int dirId = 0;
@@ -227,6 +226,7 @@ private:
   Output out{1}; // verbose level = 1
 
 public:
+
   StringIndex(char sep) : dirSeparator(sep) {
     root = new PathSegment();
     root->parent = nullptr;
@@ -283,6 +283,8 @@ public:
 
   void waitUntilDone() { pool->waitUntilDone(); }
 
+  int size() { return seglist.size(); }
+
   /**
    * Add a string to the index to be searched for afterwards
    *
@@ -291,6 +293,7 @@ public:
    * @param separator Can be used to split filePath to components (e.g. 'home','user'...). Usually
    * one of {'\\', '/', '\0' (no separation)}.
    */
+
   void addStrToIndex(std::string filePath, int fileId, const char &separator) {
     out.printv(3, "Add file:", filePath, ",", fileId, ",", separator);
 

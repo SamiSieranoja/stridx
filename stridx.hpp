@@ -423,7 +423,7 @@ public:
   }
 
   // Return int64_t representation of the first nchars in str, starting from index i
-  [[nodiscard]] int64_t getKeyAtIdx(std::string str, int i, int nchars) {
+  [[nodiscard]] int64_t getKeyAtIdx(const std::string &str, int i, int nchars) {
     int64_t key = 0;
     for (int i_char = 0; i_char < nchars; i_char++) {
       key = key | static_cast<int64_t>(str[i + i_char]);

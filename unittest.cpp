@@ -67,8 +67,6 @@ TEST(IndexSearch, MatchingScoresThreaded) { scoreTest(true); }
 
 class IndexTest : public testing::Test {
 protected:
-  // unique_ptr<StrIdx::StringIndex> idx StrIdx::StringIndex idx{'/'};
-  // auto idx = std::make_unique<StrIdx::StringIndex>('/');
   std::unique_ptr<StrIdx::StringIndex> idx = std::make_unique<StrIdx::StringIndex>('/');
 
   IndexTest() {}
@@ -105,12 +103,40 @@ TEST_F(IndexTest, BinaryRepresentation3) {
       s == "0000000000000000000000000000000000000000000000000000000001101000"); // 01101000 == "h"
 }
 
+TEST_F(IndexTest, AccessString) {
+  idx->addStrToIndex("./drivers/i2c/busses/i2c-nomadik.c", 0);
+  idx->addStrToIndex("./drivers/i2c/busses/i2c-nomadiksdf.c", 2);
+  idx->addStrToIndex("./drivers//i2c///busses////aa-i2c-nomadiksdf.c", 3);
+  idx->addStrToIndex("/test/foo/bar.txt", 4);
+  idx->addStrToIndex("bar.txt", 5);
+
+  EXPECT_EQ(idx->size(), 5);
+  EXPECT_STREQ(idx->getString(0).c_str(), "./drivers/i2c/busses/i2c-nomadik.c");
+
+  // TODO: does not work yet
+  //  EXPECT_STREQ(idx->getString(3).c_str(), "./drivers//i2c///busses////aa-i2c-nomadiksdf.c");
+
+  // TODO: does not work yet
+  //  EXPECT_STREQ(idx->getString(4).c_str(), "/test/foo/bar.txt");
+  EXPECT_STREQ(idx->getString(5).c_str(), "bar.txt");
+}
+
 TEST_F(IndexTest, Size1) {
+  // Should not add different files with same id
   idx->addStrToIndex("./drivers/i2c/busses/i2c-nomadik.c", 0);
   idx->addStrToIndex("./drivers/i2c/busses/i2c-nomadiksdf.c", 0);
+
+  // Should not be added because essentially same as 0:
+  idx->addStrToIndex("./drivers//i2c///busses////i2c-nomadik.c", 44);
+
+  // Should not add same file with different id
   idx->addStrToIndex("./drivers/i2c/busses/i2c-nomadik.c", 1);
   idx->addStrToIndex("./drivers/i2c/busses/i2c-nomadik.c", 2);
+
   EXPECT_EQ(idx->size(), 1);
+
+  // Test no-overwriting
+  EXPECT_STREQ(idx->getString(0).c_str(), "./drivers/i2c/busses/i2c-nomadik.c");
 }
 
 TEST_F(IndexTest, Size2) {

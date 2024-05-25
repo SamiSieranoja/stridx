@@ -14,14 +14,14 @@ FetchContent_MakeAvailable(googletest)
 enable_testing()
 
 add_executable(
-  hello_test
+  stridx_test
   unittest.cpp
 )
 target_link_libraries(
-  hello_test
+  stridx_test
   GTest::gtest_main
 )
 
 include(GoogleTest)
-gtest_discover_tests(hello_test)
+gtest_discover_tests(stridx_test)
 

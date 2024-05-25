@@ -226,7 +226,6 @@ private:
   Output out{1}; // verbose level = 1
 
 public:
-
   StringIndex(char sep) : dirSeparator(sep) {
     root = new PathSegment();
     root->parent = nullptr;
@@ -297,6 +296,11 @@ public:
   void addStrToIndex(std::string filePath, int fileId, const char &separator) {
     out.printv(3, "Add file:", filePath, ",", fileId, ",", separator);
 
+    // If a string with this index has beeen added already
+    if (seglist.find(fileId) != seglist.end()) {
+      return;
+    }
+
     std::vector<std::string> segs;
     numStrings += 1;
 
@@ -346,6 +350,17 @@ public:
 
       prev = p;
     }
+  }
+
+  std::string getString(int id) {
+    std::string s = "";
+    PathSegment *seg = seglist[id];
+    s += seg->str;
+    while (seg->parent->parent != nullptr) {
+      seg = seg->parent;
+      s = seg->str + dirSeparator + s;
+    }
+    return s;
   }
 
   /**

@@ -33,16 +33,16 @@ public:
   Output(int verb) : verboseLevel(verb) {}
   Output() : Output(3) {}
   ~Output() = default;
-  void print() {}
+  static void print() {}
 
   // When calling as print("xxx ",3, " yyy") outputs "xxx 3 yyy"
-  template <typename T, typename... Types> void print(T var1, Types... var2) {
+  template <typename T, typename... Types> static void print(T var1, Types... var2) {
     std::cout << var1;
     print(var2...);
   }
 
   // When calling as printl("xxx ",3, " yyy") outputs "xxx 3 yyy\n"
-  template <typename... Types> void printl(Types... var2) {
+  template <typename... Types> static void printl(Types... var2) {
     print(var2...);
     print("\n");
   }
@@ -79,7 +79,7 @@ std::vector<std::string> splitString(const std::string &input, const char &separ
 }
 
 // Convert int64_t to binary string
-[[nodiscard]] std::string int64ToBinaryString(int64_t num) {
+[[nodiscard]] std::string int64ToBinaryString(const int64_t &num) {
   std::string result;
   for (int i = 63; i >= 0; --i) {
     result += ((num >> i) & 1) ? '1' : '0';
@@ -88,7 +88,7 @@ std::vector<std::string> splitString(const std::string &input, const char &separ
 }
 
 // Debug. Convert a (8 char) string represented as int64_t to std::string
-[[nodiscard]] std::string int64ToStr(int64_t key) {
+[[nodiscard]] std::string int64ToStr(const int64_t &key) {
   int nchars = 8;
   std::string str;
   int multip = nchars * 8;
@@ -108,7 +108,7 @@ void printVector(const std::vector<int> &vec) {
 }
 
 // Debug
-[[nodiscard]] std::string charToBinaryString(char chr) {
+[[nodiscard]] std::string charToBinaryString(const char &chr) {
   std::string result;
   for (int i = 7; i >= 0; --i) {
     result += ((chr >> i) & 1) ? '1' : '0';
@@ -122,8 +122,7 @@ enum class segmentType { Dir, File };
 // A segment of a file path
 // e.g. if path is /foo/bar/baz.txt
 // segments are [{root}, foo, bar, baz.txt]
-class PathSegment {
-public:
+struct PathSegment {
   std::string str;
   int fileId; // (if FILE)
   Candidate *cand;
@@ -135,7 +134,7 @@ public:
   PathSegment(std::string _str) : str(_str), parent(nullptr) {}
   PathSegment(std::string _str, int _fileId)
       : str(_str), fileId(_fileId), cand(nullptr), parent(nullptr) {}
-  [[nodiscard]] int size() {
+  [[nodiscard]] int size() const {
     int sz = str.size();
     PathSegment *cur = parent;
     // Sum up length of parent segments (+1 for divisors)
@@ -148,8 +147,7 @@ public:
 };
 
 // Candidate for result in string (filename) search
-class Candidate {
-public:
+struct Candidate {
   std::vector<float> v_charscore;
   PathSegment *seg;
   int fileId;
@@ -162,25 +160,17 @@ public:
   int candLen; // Length of candidate
 
   Candidate(){};
-  Candidate(int _fileId, std::string _str, int _len) : fileId(_fileId), str(_str), len(_len) {
-    // Initialize v_charscores with zeros
-    v_charscore.resize(len, 0);
-    candLen = str.size();
-    seg = nullptr;
-  }
-
   Candidate(PathSegment *_seg, int _len) : seg(_seg), len(_len) {
     // Initialize v_charscores with zeros
     v_charscore.resize(len, 0);
     candLen = seg->size();
   }
 
-  [[nodiscard]] float getScore() {
+  [[nodiscard]] float getScore() const {
     int i = 0;
     float score = 0.0;
-    candLen = seg->size();
 
-    for (float &charscore : v_charscore) {
+    for (const float &charscore : v_charscore) {
       score += charscore;
       i++;
     }
@@ -193,7 +183,7 @@ public:
     return score;
   }
 
-  [[nodiscard]] float operator[](int idx) { return v_charscore[idx]; }
+  [[nodiscard]] float operator[](int idx) const { return v_charscore[idx]; }
 };
 
 // This seems to give 10x speed improvement over std::unordered_map
@@ -210,7 +200,9 @@ private:
   int numStrings = 0;
 
   std::vector<SegMap *> dirmaps;
+  std::array<std::mutex, 9> mts_d; // for dirmaps
   std::vector<SegMap *> filemaps;
+  std::array<std::mutex, 9> mts_f; // for filemaps
 
   std::vector<PathSegment *> segsToClean;
 
@@ -218,9 +210,6 @@ private:
   PathSegment *root;
   int dirId = 0;
   float dirWeight = 0.7; // Give only 70% of score if match is for a directory
-
-  std::array<std::mutex, 9> mts_f;
-  std::array<std::mutex, 9> mts_d;
 
   std::unique_ptr<ThreadPool> pool;
   Output out{1}; // verbose level = 1
@@ -278,11 +267,11 @@ public:
   void addStrToIndexThreaded(std::string filePath, int fileId) {
     pool->enqueue([=] { addStrToIndex(filePath, fileId, dirSeparator); });
   }
-  void waitUntilReady() { pool->waitUntilDone(); }
+  void waitUntilReady() const { pool->waitUntilDone(); }
 
-  void waitUntilDone() { pool->waitUntilDone(); }
+  void waitUntilDone() const { pool->waitUntilDone(); }
 
-  int size() { return seglist.size(); }
+  int size() const { return seglist.size(); }
 
   /**
    * Add a string to the index to be searched for afterwards
@@ -294,7 +283,7 @@ public:
    */
 
   void addStrToIndex(std::string filePath, int fileId, const char &separator) {
-    out.printv(3, "Add file:", filePath, ",", fileId, ",", separator);
+    out.printv(3, "Add file:", filePath, ",", fileId, ",", separator, ",",dirSeparator);
 
     // If a string with this index has beeen added already
     if (seglist.find(fileId) != seglist.end()) {
@@ -441,7 +430,7 @@ public:
   }
 
   // Return int64_t representation of the first nchars in str, starting from index i
-  [[nodiscard]] int64_t getKeyAtIdx(const std::string &str, int i, int nchars) {
+  [[nodiscard]] int64_t getKeyAtIdx(const std::string &str, int i, int nchars) const {
     int64_t key = 0;
     for (int i_char = 0; i_char < nchars; i_char++) {
       key = key | static_cast<int64_t>(str[i + i_char]);
@@ -537,7 +526,7 @@ private:
   // Find pathsegments from <map> that include the substring of <str> which starts at index <i> and
   // is of length <nchars>.
   [[nodiscard]] std::vector<PathSegment *> findSimilarForNgram(std::string str, int i, int nchars,
-                                                               SegMap &map) {
+                                                               SegMap &map) const {
 
     assert(i + nchars <= static_cast<int>(str.size()));
     std::vector<PathSegment *> res;

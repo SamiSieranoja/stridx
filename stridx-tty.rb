@@ -8,6 +8,12 @@ require "pastel"
 require "socket"
 
 class StrIdxTTY
+  def self.run
+    stty = StrIdxTTY.new
+    selected = stty.search
+    STDOUT.write selected
+  end
+
   def initialize()
     @lines = []
     @selected = ""
@@ -45,7 +51,7 @@ class StrIdxTTY
     client = UNIXSocket.new(sockfn)
 
     # Send data to the server
-    client.puts query
+    client.puts "find:#{query}"
 
     # Read response from the server
     response = client.recv(200 * 200)
@@ -94,7 +100,3 @@ class StrIdxTTY
   end
 end
 
-stty = StrIdxTTY.new
-selected = stty.search
-
-STDOUT.write selected

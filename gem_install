@@ -1,0 +1,4 @@
+gem uninstall --force -x StrIdx
+gem build stridx.gemspec
+gem install $(ls -1tr StrIdx*gem | tail -n 1)
+

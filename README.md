@@ -5,8 +5,14 @@ The fuzziness means that candidate filepaths do not need to include exact match 
 
 The library can be applied for UTF-8 data also, although there is a small bias in scoring for multibyte characters.
 
+1. [String similarity calculation](#stringsim)
+2. [Interfaces](#interfaces)
+    1. [Command line](#comm)
+    2. [Ruby](#ruby)
+    3. [C++](#cpp)
 
-## String similarity calculation
+
+## String similarity calculation <a name="stringsim"/>
 
 Once the index has been created, the contents can be searched to find the best matching strings. 
 
@@ -39,7 +45,7 @@ and candidate is "./drivers/char/hw_random/nomadik-rng.c", then scores are calcu
 
 # Interfaces
 
-## Commandline
+## Commandline <a name="comm"/>
 Install instructions (for Ubuntu Linux):
 ```
 apt update
@@ -66,6 +72,7 @@ Stop server:
 ```
 stridx.rb stop
 ```
+In case stop doesn't work, try: `kill $(pgrep -f runserver.rb | tail -n 1)`
 
 Start indexing server (on foreground, to debug):
 ```
@@ -151,7 +158,7 @@ Search time: 0.0488 seconds
 ```
 
 
-## C++
+## C++ <a name="cpp"/>
 See demo.cpp
 ```cpp
 #include "stridx.hpp"

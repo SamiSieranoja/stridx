@@ -1,6 +1,6 @@
 Gem::Specification.new do |spec|
   spec.name = "StrIdx"
-  spec.version = "0.1.3"
+  spec.version = "0.1.4"
   spec.authors = ["Sami Sieranoja"]
   spec.email = ["sami.sieranoja@gmail.com"]
 
@@ -13,10 +13,6 @@ Gem::Specification.new do |spec|
   spec.files = `git ls-files -z`.split("\x0").reject do |f|
     f.match(%r{^(refcode|spec|features)/})
   end
-  spec.files << "thread_pool.hpp"
-  spec.files << "exe/stridx.rb"
-  spec.files << "server.rb"
-  spec.files << "stridx-tty.rb"
 
   spec.bindir = "exe"
   spec.executables = spec.files.grep(%r{^exe/}) { |f| File.basename(f) }

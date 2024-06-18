@@ -57,9 +57,10 @@ Add bash keybindings (Ctrl-t):
 eval "$(stridx.rb bash)"
 ```
 
-<video src="https://raw.githubusercontent.com/SamiSieranoja/stridx/dev/stridx-screencast.mp4" width="695px"></video>
-
 Search by pressing <kbd>ctrl</kbd>+<kbd>t</kbd>.  Keys: <kbd>up</kbd>, <kbd>down</kbd>, select with <kbd>enter</kbd>
+
+<video auto-play="true" loop="loop" muted="muted" plays-inline="true" width="695px" src="https://github.com/SamiSieranoja/stridx/assets/46612258/d16fe638-8bd6-4348-894e-b28bb8181439" controls autoplay >
+</video>
 
 Stop server:
 ```

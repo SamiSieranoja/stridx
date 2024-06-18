@@ -59,8 +59,8 @@ eval "$(stridx.rb bash)"
 
 Search by pressing <kbd>ctrl</kbd>+<kbd>t</kbd>.  Keys: <kbd>up</kbd>, <kbd>down</kbd>, select with <kbd>enter</kbd>
 
-<video auto-play="true" loop="loop" muted="muted" plays-inline="true" width="695px" src="https://github.com/SamiSieranoja/stridx/assets/46612258/d16fe638-8bd6-4348-894e-b28bb8181439" controls autoplay >
-</video>
+![screencast](https://github.com/SamiSieranoja/stridx/assets/46612258/b2fd4fa2-37ad-4423-bd5f-d54b24ff6df5)
+
 
 Stop server:
 ```

@@ -57,6 +57,7 @@ Start indexing server (on background):
 ```
 stridx.rb start -- ~/Documents/ ~/Pictures/
 ```
+(Warning: The indexing can take a lot of memory if there are more than 200,000 filenames in the folders)
 
 Add bash keybindings (Ctrl-t):
 ```

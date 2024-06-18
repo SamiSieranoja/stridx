@@ -40,7 +40,7 @@ and candidate is "./drivers/char/hw_random/nomadik-rng.c", then scores are calcu
 # Interfaces
 
 ## Commandline
-Install:
+Install instructions (for Ubuntu Linux):
 ```
 apt update
 apt install ruby ruby-dev build-essential
@@ -76,6 +76,7 @@ stridx.rb run -- ~/Documents/ ~/Pictures/
 ## Ruby
 Install:
 ```
+apt install ruby ruby-dev build-essential
 gem install StrIdx
 ```
 

@@ -22,6 +22,25 @@ class StrIdxTTY
     @reader = TTY::Reader.new(output: STDERR)
     @pastel = Pastel.new()
     @cursor = TTY::Cursor
+
+    sock_dir = File.expand_path("~/.stridx")
+    sockfn = "#{sock_dir}/sock"
+
+    error = true
+    while error
+      begin
+        # Create a new UNIXSocket
+        client = UNIXSocket.new(sockfn)
+      rescue Errno::ECONNREFUSED => e
+        out "Waiting for server to start\n"
+        sleep 2
+        error = true
+      else
+        error = false
+        client.close
+        #... executes when no error
+      end
+    end
   end
 
   def out(x)
@@ -76,27 +95,28 @@ class StrIdxTTY
     end
   end
 
+  def update_search(event)
+    query = event.line[3..-1]
+    if query.size > 2
+      @list = get_res_from_server(query)
+      draw_list
+    end
+  end
+
   def handle_event(event)
     out @cursor.save
     if event.key.name == :alpha
-      query = event.line[3..-1]
-      if query.size > 2
-        @list = get_res_from_server(query)
-        draw_list
-      end
-    end
-
-    if event.key.name == :up
+      update_search(event)
+    elsif event.key.name == :up
       @idx += 1 if @idx < @list.size - 1
       draw_list
     elsif event.key.name == :down
       @idx -= 1 if @idx > 0
       draw_list
+    elsif event.key.name == :backspace
+      update_search(event)
     end
 
-    out @cursor.up(1)
-    out @cursor.clear_line
     out @cursor.restore
   end
 end
-

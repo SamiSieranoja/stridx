@@ -37,7 +37,42 @@ and candidate is "./drivers/char/hw_random/nomadik-rng.c", then scores are calcu
     score = score1/(11*11)*0.97 + score1/(11*38)*0.03 = 0.342944
 ```
 
-# Ruby interface
+# Interfaces
+
+## Commandline
+Install:
+```
+apt update
+apt install ruby ruby-dev build-essential
+gem install StrIdx
+```
+
+Start indexing server (on background):
+```
+stridx.rb start -- ~/Documents/ ~/Pictures/
+```
+
+Add bash keybindings (Ctrl-t):
+```
+eval "$(stridx.rb bash)"
+```
+
+<video src="https://raw.githubusercontent.com/SamiSieranoja/stridx/dev/stridx-screencast.mp4" width="695px"></video>
+
+Search by pressing <kbd>ctrl</kbd>+<kbd>t</kbd>.  Keys: <kbd>up</kbd>, <kbd>down</kbd>, select with <kbd>enter</kbd>
+
+Stop server:
+```
+stridx.rb stop
+```
+
+Start indexing server (on foreground, to debug):
+```
+stridx.rb run -- ~/Documents/ ~/Pictures/
+```
+
+
+## Ruby
 Install:
 ```
 gem install StrIdx
@@ -114,7 +149,7 @@ Search time: 0.0488 seconds
 ```
 
 
-# C++ API
+## C++
 See demo.cpp
 ```cpp
 #include "stridx.hpp"

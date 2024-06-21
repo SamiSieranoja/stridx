@@ -28,6 +28,7 @@ namespace StrIdx {
 class Output {
 private:
   int verboseLevel;
+  // TODO: add mutex?
 
 public:
   Output(int verb) : verboseLevel(verb) {}
@@ -191,8 +192,7 @@ typedef ankerl::unordered_dense::map<int64_t, std::set<PathSegment *> *> SegMap;
 // typedef std::unordered_map<int64_t, std::set<PathSegment *> *> SegMap;
 
 typedef ankerl::unordered_dense::map<int, Candidate *> CandMap;
-// typedef std::unordered_map<int, Candidate*> CandMap;
-
+// typedef std::unordered_map<int, Candidate *> CandMap;
 
 typedef std::shared_ptr<SegMap> MapType;
 typedef std::vector<MapType> MapVec;
@@ -211,6 +211,8 @@ private:
   std::vector<PathSegment *> segsToClean;
 
   std::unordered_map<int, PathSegment *> seglist;
+  std::mutex seglist_mu;
+
   PathSegment *root;
   int dirId = 0;
   float dirWeight = 0.7; // Give only 70% of score if match is for a directory
@@ -237,7 +239,7 @@ public:
     pool = std::unique_ptr<ThreadPool>(new ThreadPool(num_threads));
   }
 
-  /* Don't separate path to segments separator=\0.
+  /* Don't separate path to segments when separator=\0.
      This is slower, but can be used for other data than files also.  */
   StringIndex() : StringIndex('\0') {}
 
@@ -273,7 +275,10 @@ public:
 
   void waitUntilDone() const { pool->waitUntilDone(); }
 
-  int size() const { return seglist.size(); }
+  int size() {
+    std::lock_guard<std::mutex> guard(seglist_mu);
+    return seglist.size();
+  }
 
   /**
    * Add a string to the index to be searched for afterwards
@@ -288,8 +293,12 @@ public:
     out.printv(3, "Add file:", filePath, ",", fileId, ",", separator, ",", dirSeparator);
 
     // If a string with this index has beeen added already
-    if (seglist.find(fileId) != seglist.end()) {
-      return;
+
+    {
+      std::lock_guard<std::mutex> guard(seglist_mu);
+      if (seglist.find(fileId) != seglist.end()) {
+        return;
+      }
     }
 
     std::vector<std::string> segs;
@@ -327,7 +336,10 @@ public:
         // If this is last item in segs, then it is a file.
         if (_x == std::prev(segs.end())) {
           p->type = segmentType::File;
-          seglist[fileId] = p;
+          {
+            std::lock_guard<std::mutex> guard(seglist_mu);
+            seglist[fileId] = p;
+          }
         } else { // otherwise, it is a directory
           p->type = segmentType::Dir;
           p->fileId = dirId;
@@ -345,6 +357,8 @@ public:
 
   std::string getString(int id) {
     std::string s = "";
+    std::lock_guard<std::mutex> guard(seglist_mu);
+
     PathSegment *seg = seglist[id];
     s += seg->str;
     while (seg->parent->parent != nullptr) {

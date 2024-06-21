@@ -193,15 +193,19 @@ typedef ankerl::unordered_dense::map<int64_t, std::set<PathSegment *> *> SegMap;
 typedef ankerl::unordered_dense::map<int, Candidate *> CandMap;
 // typedef std::unordered_map<int, Candidate*> CandMap;
 
+
+typedef std::shared_ptr<SegMap> MapType;
+typedef std::vector<MapType> MapVec;
+
 class StringIndex {
 private:
   int tmp;
   char dirSeparator = '/'; // Usually '/', '\' or '\0' (no separator)
   int numStrings = 0;
 
-  std::vector<SegMap *> dirmaps;
+  MapVec dirmaps;
   std::array<std::mutex, 9> mts_d; // for dirmaps
-  std::vector<SegMap *> filemaps;
+  MapVec filemaps;
   std::array<std::mutex, 9> mts_f; // for filemaps
 
   std::vector<PathSegment *> segsToClean;
@@ -221,8 +225,8 @@ public:
     root->str = "[ROOT]";
 
     for (int i = 0; i <= 8; i++) {
-      dirmaps.push_back(new SegMap);
-      filemaps.push_back(new SegMap);
+      filemaps.push_back(MapType(new SegMap));
+      dirmaps.push_back(MapType(new SegMap));
     }
 
     // Threads between 4 and 6
@@ -247,7 +251,6 @@ public:
         delete (y.second);
       }
       x->clear();
-      delete x;
     }
     for (auto x : filemaps) {
       for (auto y : *x) {
@@ -255,7 +258,6 @@ public:
         delete (y.second);
       }
       x->clear();
-      delete x;
     }
     clearPathSegmentChildren(root);
   }
@@ -283,7 +285,7 @@ public:
    */
 
   void addStrToIndex(std::string filePath, int fileId, const char &separator) {
-    out.printv(3, "Add file:", filePath, ",", fileId, ",", separator, ",",dirSeparator);
+    out.printv(3, "Add file:", filePath, ",", fileId, ",", separator, ",", dirSeparator);
 
     // If a string with this index has beeen added already
     if (seglist.find(fileId) != seglist.end()) {
@@ -491,7 +493,7 @@ private:
     for (int sublen = minChars; sublen <= maxChars; sublen++) {
 
       std::mutex *mu;
-      SegMap *map;
+      MapType map;
       if (p->type == segmentType::File) {
         map = filemaps[sublen];
         mu = &mts_f[sublen];
@@ -545,7 +547,7 @@ private:
   }
 
   void addToCandMap(CandMap &candmap, std::string query,
-                    std::vector<SegMap *> &map // filemaps or dirmaps
+                    MapVec &map // filemaps or dirmaps
   ) {
     int maxChars = 8;
     int minChars = 2;

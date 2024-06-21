@@ -45,6 +45,10 @@ int main() {
   // Add the file paths of 89828 files in linux-6.9-rc6 to the index
   std::string fn_filePaths = "flist.txt";
   std::vector<std::string> v_filePaths = readLinesFromFile(fn_filePaths);
+  
+  // int* a = new int[10];
+  // delete(a);
+  // delete(a);
 
 	// Launch indexing to be run on background
   cout << "File paths: " << v_filePaths.size() << std::endl;

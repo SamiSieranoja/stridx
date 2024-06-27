@@ -62,57 +62,6 @@ public:
     printl(var2...);
   }
 };
-
-// 426000
-class CharMap2 {
-public:
-  // std::map<char, std::shared_ptr<CharMap2>> map;
-  std::map<char, CharMap2 *> map;
-  // std::vector<std::pair<char, CharMap2>> vec;
-  // std::set<int> ids;
-  std::vector<int> ids;
-
-  void addStr(std::string s, int id) { addStr(s, id, 0, this); }
-  void addStr(std::string s, int id, int level) { addStr(s, id, level, this); }
-  void addStr(std::string s, int id, int level, CharMap2 *root) {
-    if (level >= 8) {
-      return;
-    }
-    if (s.size() >= 1) {
-      char &c = s[0];
-      if (auto it = map.find(c); it == map.end()) {
-        // map[c] = CharMap2{};
-        // map[c] = std::make_shared<CharMap2>();
-        map[c] = new CharMap2;
-      }
-      if (auto it = std::find(ids.begin(), ids.end(), id); it == (*map[c]).ids.end()) {
-        (*map[c]).ids.push_back(id);
-      }
-
-      if (s.size() > 1) {
-        // (*map[c]).addStr(s.substr(1, s.size() - 1), id, level + 1);
-        (*map[c]).addStr(s.substr(1, s.size() - 1), id, level + 1, root);
-        // CharMap2 *cmap = map[c]->map[c];
-        if (auto it = root->map.find(c); it == root->map.end()) {
-          root->map[c] = map[c];
-        }
-      }
-    }
-  }
-
-  void debug() { debug(""); }
-  void debug(std::string trail) {
-    Output out;
-    for (const auto &[c, m] : map) {
-      // out.print(c);
-      map[c]->debug(trail + c);
-    }
-    if (map.size() == 0) {
-      out.print(trail, "\n");
-    }
-  }
-};
-
 // 426000
 class CharMap {
 public:
@@ -152,10 +101,13 @@ public:
 
 struct CharNode {
   int *ids;
+  int ids_sz;
   char c;
   std::uint8_t size;
   CharNode *children;
-  CharNode() : ids(nullptr), c(0), size(0), children(nullptr) {}
+  CharNode() : ids(nullptr), ids_sz(0), c(0), size(0), children(nullptr) {}
+  // std::vector<int> ids ={};
+  // CharNode() : c(0), size(0), children(nullptr) {}
 };
 
 // typedef std::array<void *, 256> cArr;
@@ -163,18 +115,10 @@ class CharMap3 {
   Output out;
 
 public:
-  // std::map<char, CharMap> map;
-  // std::map<char, int> map;  // std::vector<int> ids;
-  // int* ids;
-  // int map[256*256*256];
-  // CharNode map[256*256*256];
-  // CharNode *map[256];
-
-  std::array<void *, 256> map = {};
   CharNode *root;
 
   CharMap3() {
-    std::fill(map.begin(), map.end(), nullptr);
+    // std::fill(map.begin(), map.end(), nullptr);
     root = new CharNode;
   }
 
@@ -186,27 +130,13 @@ public:
 
     CharNode *cn = root;
 
-    // std::array<void *, 256> *curmap;
-    // curmap = &map;
-    out.printl("add:", s);
+    // out.printl("add:", s);
 
     for (int i = 0; i < s.size() && i < 8; i++) {
-      // char &c = s[i];
       int c = ((char)s[i]);
-      out.printl("ii:", i, " ", static_cast<char>(c), "|", (int)cn->size);
-      // std::cout << c << std::endl;
-      // std::cout << (char)c << " " << (*curmap)[c];
-      // std::cout << (char)c;
-
-      // if ((*curmap)[c] == nullptr && i !=7 ) {
-
-      // auto it = std::find_if(cn->children, cn->children + cn->size,
-      // [c](CharNode *cc) { return cc->c == c; });
-      // auto it = std::find_if(cn->children, cn->children + cn->size,
-      // [](CharNode *cc) { return cc->c == 3; });
+      // out.printl("ii:", i, " ", static_cast<char>(c), "|", (int)cn->size);
       bool found = false;
 
-      // out.printl(cn);
       if (cn->size > 0) {
         // out.printl("(1) cn->size > 0");
         for (auto it = cn->children; it != cn->children + cn->size; it++) {
@@ -224,7 +154,8 @@ public:
         if (cn->size > 0) {
           // out.printl("size > 0");
           memcpy(x, cn->children, sizeof(CharNode) * (cn->size));
-          free(cn->children);
+          delete[] cn->children;
+          // free(cn->children);
         }
         cn->children = x;
         CharNode *nn = &(cn->children[cn->size]);
@@ -233,76 +164,61 @@ public:
         cn = nn;
       }
 
-      // cn->size++;
-      // cn->children = new CharNode[1];
+      if (i == s.size() - 1 && false) {
+        bool found = false;
+        if (cn->ids_sz > 0) {
+          for (int i = 0; i < cn->ids_sz; i++) {
+            if (cn->ids[i] == id) {
+              found = true;
+              out.printl("found:", id);
+            }
+          }
+        }
+        if (!found) {
+          auto x = new int[cn->ids_sz + 1];
+          if (cn->ids_sz > 0) {
+            memcpy(x, cn->ids, cn->ids_sz);
+            delete[] cn->ids;
+          }
+          cn->ids = x;
+          cn->ids[cn->ids_sz] = id;
+          cn->ids_sz++;
+        }
+      }
 
-      // if ((*curmap)[c] == nullptr) {
-      // auto a = new std::array<void *, 256>{};
-      // (*curmap)[c] = (void *)a;
-      // std::cout << ":";
-      // auto m = (std::array<void *, 256> *)((*curmap)[c]);
-
-      // std::fill((*m).begin(), (*m).end(), nullptr);
-      // std::fill(a->begin(), a->end(), nullptr);
-      // for (int i = 0; i < 256; i++) {
-      // // ((std::array<void *, 256>*)m)[i] = nullptr;
-      // (*((std::array<void *, 256> *)m))[i] = nullptr;
-      // }
-    }
-    // curmap = (std::array<void *, 256> *)((*curmap)[c]);
-    // if (auto it = map.find(s[0]); it == map.end()) {
-    // map[c] = CharMap{};
-    // }
-    // if (auto it = std::find(ids.begin(), ids.end(), id); it == map[c].ids.end()) {
-    // map[c].ids.push_back(id);
+    } // for
   }
 
-  // map[c].addStr(s.substr(1, s.size() - 1), id, level + 1);
-  // std::cout << std::endl;
+  void debug() { debug("", root); }
+  void debug(std::string trail, CharNode *cn) {
+    return;
 
-  void debug() { debug("", &map); }
-  // void debug() { }
-  void debug(std::string trail, std::array<void *, 256> *curmap) {
-    Output out;
+    // if (trail.size() > 6) {
+    // out.print("\n");
+    // return;
+    // }
 
-    if (trail.size() > 6) {
-      out.print("\n");
+    if (cn == nullptr) {
       return;
     }
-
-    auto &m = *curmap;
-
-    // std::cout << "map:" << curmap << std::endl;
-    for (int i = 0; i < 200; i++) {
-      // std::cout << "c: " << m[i];
-    }
-    std::cout << std::endl;
-
-    if (curmap == nullptr) {
-      return;
-    }
-    for (int i = 0; i < 200; i++) {
-      // std::cout << "f:" << i << " " << (char) i << " " << m[i] << "|";
-      if (m[i] != nullptr) {
-        out.print(trail, (char)i);
-
-        std::array<void *, 256> *arr = (std::array<void *, 256> *)((*curmap)[(char)i]);
-
-        // std::cout << "map1:" << i << "," << (char)i << "," << curmap << "," << arr << std::endl;
-        // std::cout << (char)i ;
-        // std::array<void *, 256> *arr = (*curmap)[i];
-        debug(trail + (char)i, arr);
+    for (int i = 0; i < cn->size; i++) {
+      CharNode *child = &cn->children[i];
+      if (child->size > 0) {
+        debug(trail + child->c, child);
+      } else {
+        out.printl(trail, child->c);
+        // out.printl();
       }
     }
-
-    // for (const auto &[c, m] : map) {
-    // out.print(c);
-    // map[c].debug(trail + c);
-    // }
-    // if (map.size() == 0) {
-    // out.print(trail, "\n");
-    // }
   }
+
+  // for (const auto &[c, m] : map) {
+  // out.print(c);
+  // map[c].debug(trail + c);
+  // }
+  // if (map.size() == 0) {
+  // out.print(trail, "\n");
+  // }
 };
 
 // Transforms input string as follows:

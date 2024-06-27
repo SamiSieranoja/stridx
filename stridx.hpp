@@ -10,6 +10,7 @@
 #include <array>
 #include <iostream>
 #include <unordered_map>
+#include <map>
 #include <set>
 #include <algorithm>
 #include <sstream>
@@ -59,6 +60,248 @@ public:
       print("[v=", vlevel, "] ");
     }
     printl(var2...);
+  }
+};
+
+// 426000
+class CharMap2 {
+public:
+  // std::map<char, std::shared_ptr<CharMap2>> map;
+  std::map<char, CharMap2 *> map;
+  // std::vector<std::pair<char, CharMap2>> vec;
+  // std::set<int> ids;
+  std::vector<int> ids;
+
+  void addStr(std::string s, int id) { addStr(s, id, 0, this); }
+  void addStr(std::string s, int id, int level) { addStr(s, id, level, this); }
+  void addStr(std::string s, int id, int level, CharMap2 *root) {
+    if (level >= 8) {
+      return;
+    }
+    if (s.size() >= 1) {
+      char &c = s[0];
+      if (auto it = map.find(c); it == map.end()) {
+        // map[c] = CharMap2{};
+        // map[c] = std::make_shared<CharMap2>();
+        map[c] = new CharMap2;
+      }
+      if (auto it = std::find(ids.begin(), ids.end(), id); it == (*map[c]).ids.end()) {
+        (*map[c]).ids.push_back(id);
+      }
+
+      if (s.size() > 1) {
+        // (*map[c]).addStr(s.substr(1, s.size() - 1), id, level + 1);
+        (*map[c]).addStr(s.substr(1, s.size() - 1), id, level + 1, root);
+        // CharMap2 *cmap = map[c]->map[c];
+        if (auto it = root->map.find(c); it == root->map.end()) {
+          root->map[c] = map[c];
+        }
+      }
+    }
+  }
+
+  void debug() { debug(""); }
+  void debug(std::string trail) {
+    Output out;
+    for (const auto &[c, m] : map) {
+      // out.print(c);
+      map[c]->debug(trail + c);
+    }
+    if (map.size() == 0) {
+      out.print(trail, "\n");
+    }
+  }
+};
+
+// 426000
+class CharMap {
+public:
+  std::map<char, CharMap> map;
+  std::vector<int> ids;
+
+  void addStr(std::string s, int id) { addStr(s, id, 0); }
+  void addStr(std::string s, int id, int level) {
+    if (level >= 8) {
+      return;
+    }
+    if (s.size() >= 1) {
+      char &c = s[0];
+      if (auto it = map.find(s[0]); it == map.end()) {
+        map[c] = CharMap{};
+      }
+      if (auto it = std::find(ids.begin(), ids.end(), id); it == map[c].ids.end()) {
+        map[c].ids.push_back(id);
+      }
+
+      map[c].addStr(s.substr(1, s.size() - 1), id, level + 1);
+    }
+  }
+
+  void debug() { debug(""); }
+  void debug(std::string trail) {
+    Output out;
+    for (const auto &[c, m] : map) {
+      // out.print(c);
+      map[c].debug(trail + c);
+    }
+    if (map.size() == 0) {
+      out.print(trail, "\n");
+    }
+  }
+};
+
+struct CharNode {
+  int *ids;
+  char c;
+  std::uint8_t size;
+  CharNode *children;
+  CharNode() : ids(nullptr), c(0), size(0), children(nullptr) {}
+};
+
+// typedef std::array<void *, 256> cArr;
+class CharMap3 {
+  Output out;
+
+public:
+  // std::map<char, CharMap> map;
+  // std::map<char, int> map;  // std::vector<int> ids;
+  // int* ids;
+  // int map[256*256*256];
+  // CharNode map[256*256*256];
+  // CharNode *map[256];
+
+  std::array<void *, 256> map = {};
+  CharNode *root;
+
+  CharMap3() {
+    std::fill(map.begin(), map.end(), nullptr);
+    root = new CharNode;
+  }
+
+  void addStr(std::string s, int id) { addStr(s, id, 0); }
+  void addStr(std::string s, int id, int level) {
+    if (s.size() < 2) {
+      return;
+    }
+
+    CharNode *cn = root;
+
+    // std::array<void *, 256> *curmap;
+    // curmap = &map;
+    out.printl("add:", s);
+
+    for (int i = 0; i < s.size() && i < 8; i++) {
+      // char &c = s[i];
+      int c = ((char)s[i]);
+      out.printl("ii:", i, " ", static_cast<char>(c), "|", (int)cn->size);
+      // std::cout << c << std::endl;
+      // std::cout << (char)c << " " << (*curmap)[c];
+      // std::cout << (char)c;
+
+      // if ((*curmap)[c] == nullptr && i !=7 ) {
+
+      // auto it = std::find_if(cn->children, cn->children + cn->size,
+      // [c](CharNode *cc) { return cc->c == c; });
+      // auto it = std::find_if(cn->children, cn->children + cn->size,
+      // [](CharNode *cc) { return cc->c == 3; });
+      bool found = false;
+
+      // out.printl(cn);
+      if (cn->size > 0) {
+        // out.printl("(1) cn->size > 0");
+        for (auto it = cn->children; it != cn->children + cn->size; it++) {
+          if (it->c == c) {
+            // out.printl("{", c, "}");
+            found = true;
+            cn = it;
+            break;
+          }
+        }
+      }
+      if (!found) {
+        // out.printl("NF");
+        auto x = new CharNode[cn->size + 1];
+        if (cn->size > 0) {
+          // out.printl("size > 0");
+          memcpy(x, cn->children, sizeof(CharNode) * (cn->size));
+          free(cn->children);
+        }
+        cn->children = x;
+        CharNode *nn = &(cn->children[cn->size]);
+        nn->c = c;
+        cn->size++;
+        cn = nn;
+      }
+
+      // cn->size++;
+      // cn->children = new CharNode[1];
+
+      // if ((*curmap)[c] == nullptr) {
+      // auto a = new std::array<void *, 256>{};
+      // (*curmap)[c] = (void *)a;
+      // std::cout << ":";
+      // auto m = (std::array<void *, 256> *)((*curmap)[c]);
+
+      // std::fill((*m).begin(), (*m).end(), nullptr);
+      // std::fill(a->begin(), a->end(), nullptr);
+      // for (int i = 0; i < 256; i++) {
+      // // ((std::array<void *, 256>*)m)[i] = nullptr;
+      // (*((std::array<void *, 256> *)m))[i] = nullptr;
+      // }
+    }
+    // curmap = (std::array<void *, 256> *)((*curmap)[c]);
+    // if (auto it = map.find(s[0]); it == map.end()) {
+    // map[c] = CharMap{};
+    // }
+    // if (auto it = std::find(ids.begin(), ids.end(), id); it == map[c].ids.end()) {
+    // map[c].ids.push_back(id);
+  }
+
+  // map[c].addStr(s.substr(1, s.size() - 1), id, level + 1);
+  // std::cout << std::endl;
+
+  void debug() { debug("", &map); }
+  // void debug() { }
+  void debug(std::string trail, std::array<void *, 256> *curmap) {
+    Output out;
+
+    if (trail.size() > 6) {
+      out.print("\n");
+      return;
+    }
+
+    auto &m = *curmap;
+
+    // std::cout << "map:" << curmap << std::endl;
+    for (int i = 0; i < 200; i++) {
+      // std::cout << "c: " << m[i];
+    }
+    std::cout << std::endl;
+
+    if (curmap == nullptr) {
+      return;
+    }
+    for (int i = 0; i < 200; i++) {
+      // std::cout << "f:" << i << " " << (char) i << " " << m[i] << "|";
+      if (m[i] != nullptr) {
+        out.print(trail, (char)i);
+
+        std::array<void *, 256> *arr = (std::array<void *, 256> *)((*curmap)[(char)i]);
+
+        // std::cout << "map1:" << i << "," << (char)i << "," << curmap << "," << arr << std::endl;
+        // std::cout << (char)i ;
+        // std::array<void *, 256> *arr = (*curmap)[i];
+        debug(trail + (char)i, arr);
+      }
+    }
+
+    // for (const auto &[c, m] : map) {
+    // out.print(c);
+    // map[c].debug(trail + c);
+    // }
+    // if (map.size() == 0) {
+    // out.print(trail, "\n");
+    // }
   }
 };
 
@@ -129,7 +372,9 @@ struct PathSegment {
   Candidate *cand;
   PathSegment *parent;
   std::mutex mu;
-  ankerl::unordered_dense::map<std::string, PathSegment *> children;
+  // ankerl::unordered_dense::map<std::string, PathSegment *> children;
+  std::map<std::string, PathSegment *> children;
+
   segmentType type = segmentType::Dir;
   PathSegment() : parent(nullptr) {}
   PathSegment(std::string _str) : str(_str), parent(nullptr) {}
@@ -219,8 +464,10 @@ private:
 
   std::unique_ptr<ThreadPool> pool;
   Output out{1}; // verbose level = 1
+  std::mutex cm_mu;
 
 public:
+  CharMap3 cm;
   StringIndex(char sep) : dirSeparator(sep) {
     root = new PathSegment();
     root->parent = nullptr;
@@ -235,6 +482,7 @@ public:
     // We don't seem to get any benefit from more than 6 threads even if the hardware supports it
     int num_threads = std::max((int)std::thread::hardware_concurrency(), 4);
     num_threads = std::min(num_threads, 6);
+    num_threads = 1;
     out.printv(2, "Number of threads: ", num_threads);
     pool = std::unique_ptr<ThreadPool>(new ThreadPool(num_threads));
   }
@@ -292,8 +540,9 @@ public:
   void addStrToIndex(std::string filePath, int fileId, const char &separator) {
     out.printv(3, "Add file:", filePath, ",", fileId, ",", separator, ",", dirSeparator);
 
-    // If a string with this index has beeen added already
+    std::lock_guard<std::mutex> cm_guard(cm_mu);
 
+    // If a string with this index has beeen added already
     {
       std::lock_guard<std::mutex> guard(seglist_mu);
       if (seglist.find(fileId) != seglist.end()) {
@@ -339,6 +588,10 @@ public:
           {
             std::lock_guard<std::mutex> guard(seglist_mu);
             seglist[fileId] = p;
+            for (int i = 0; i < x.size() + 1; i++) {
+              auto s = x.substr(i, std::min(static_cast<size_t>(8), x.size() - i));
+              cm.addStr(s, fileId);
+            }
           }
         } else { // otherwise, it is a directory
           p->type = segmentType::Dir;
@@ -348,11 +601,12 @@ public:
         }
         prev->children[x] = p;
         prev->mu.unlock();
-        addPathSegmentKeys(p);
+        // addPathSegmentKeys(p);
       }
 
       prev = p;
     }
+    // out.printv(0, "fff");
   }
 
   std::string getString(int id) {
@@ -539,8 +793,8 @@ private:
     }
   }
 
-  // Find pathsegments from <map> that include the substring of <str> which starts at index <i> and
-  // is of length <nchars>.
+  // Find pathsegments from <map> that include the substring of <str> which starts at index <i>
+  // and is of length <nchars>.
   [[nodiscard]] std::vector<PathSegment *> findSimilarForNgram(std::string str, int i, int nchars,
                                                                SegMap &map) const {
 

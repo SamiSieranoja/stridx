@@ -106,6 +106,23 @@ struct CharNode {
   std::uint8_t size;
   CharNode *children;
   CharNode() : ids(nullptr), ids_sz(0), c(0), size(0), children(nullptr) {}
+
+  CharNode *find(char c) {
+    bool found = false;
+    CharNode *ret = nullptr;
+
+    if (size > 0) {
+      for (auto it = children; it != children + size; it++) {
+        if (it->c == c) {
+          found = true;
+          ret = it;
+          break;
+        }
+      }
+    }
+    return ret;
+  }
+
   // std::vector<int> ids ={};
   // CharNode() : c(0), size(0), children(nullptr) {}
 };
@@ -130,7 +147,7 @@ public:
 
     CharNode *cn = root;
 
-    // out.printl("add:", s);
+    out.printl("add:", s);
 
     for (int i = 0; i < s.size() && i < 8; i++) {
       int c = ((char)s[i]);
@@ -164,7 +181,8 @@ public:
         cn = nn;
       }
 
-      if (i == s.size() - 1 && false) {
+      if (i == s.size() - 1 && true) {
+        out.print("i=", i, "s:", s.size(), "|");
         bool found = false;
         if (cn->ids_sz > 0) {
           for (int i = 0; i < cn->ids_sz; i++) {
@@ -175,14 +193,16 @@ public:
           }
         }
         if (!found) {
+          out.print(".a.");
           auto x = new int[cn->ids_sz + 1];
           if (cn->ids_sz > 0) {
-            memcpy(x, cn->ids, cn->ids_sz);
+            memcpy(x, cn->ids, sizeof(int) * cn->ids_sz);
             delete[] cn->ids;
           }
           cn->ids = x;
           cn->ids[cn->ids_sz] = id;
           cn->ids_sz++;
+          out.print("sz:", cn->ids_sz, ",");
         }
       }
 
@@ -191,7 +211,6 @@ public:
 
   void debug() { debug("", root); }
   void debug(std::string trail, CharNode *cn) {
-    return;
 
     // if (trail.size() > 6) {
     // out.print("\n");
@@ -203,6 +222,7 @@ public:
     }
     for (int i = 0; i < cn->size; i++) {
       CharNode *child = &cn->children[i];
+      out.print("[", child->ids_sz, "]");
       if (child->size > 0) {
         debug(trail + child->c, child);
       } else {
@@ -626,6 +646,39 @@ public:
       }
     }
     return key;
+  }
+
+  void findSim(std::string query) {
+    out.printl("------findsim-----");
+    out.printl("query:", query);
+    int last_start = query.size() - 2;
+    for (int start = 0; start <= last_start; start++) {
+      CharNode *cn = cm.root;
+      int end = std::min(start + 7, ((int)query.size()) - 1);
+      int nchars = end - start + 1;
+      std::string s = query.substr(start, nchars);
+
+      out.print("s:|", s, "|");
+      for (int i = 0; i < s.size(); i++) {
+        char c = s[i];
+        CharNode *x = cn->find(c);
+        if (x != nullptr) {
+          out.print(c, ":");
+          cn = x;
+          // out.print("[", cn->ids_sz, "]");
+          for (int j = 0; j < cn->ids_sz; j++) {
+            out.print(cn->ids[j], ",");
+          }
+        } else {
+          for (int j = 0; j < cn->ids_sz; j++) {
+            out.print(cn->ids[j], ";");
+          }
+          break;
+        }
+      }
+      out.printl(">");
+    }
+    out.printl("------findsim END-----");
   }
 
   void debug() {

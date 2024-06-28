@@ -1,4 +1,6 @@
 
+#include <sys/resource.h>
+
 #include <condition_variable>
 #include <functional>
 #include <iostream>
@@ -45,12 +47,12 @@ int main() {
   // Add the file paths of 89828 files in linux-6.9-rc6 to the index
   std::string fn_filePaths = "flist.txt";
   std::vector<std::string> v_filePaths = readLinesFromFile(fn_filePaths);
-  
+
   // int* a = new int[10];
   // delete(a);
   // delete(a);
 
-	// Launch indexing to be run on background
+  // Launch indexing to be run on background
   cout << "File paths: " << v_filePaths.size() << std::endl;
   cout << "Start indexing in the background" << std::endl;
   auto start = std::chrono::high_resolution_clock::now();
@@ -64,22 +66,33 @@ int main() {
   std::chrono::duration<double, std::milli> duration_launch = idx_time_launch - start;
   cout << "Indexing launch time (seconds): " << duration_launch.count() / 1000 << "\n";
 
-	// Wait until indexing has finished
+  // Wait until indexing has finished
   idx.waitUntilDone();
 
   auto idx_time = std::chrono::high_resolution_clock::now();
   std::chrono::duration<double, std::milli> duration = idx_time - start;
   cout << "Indexing finished time for " << v_filePaths.size()
        << " file paths (seconds): " << duration.count() / 1000 << "\n";
+       
+       
+  cout << "DEBUG" << std::endl;
+	// idx.cm.debug();
+  cout << "END DEBUG" << std::endl;
 
   // Find matching filepaths from the index for the query string "rngnomadriv"
   start = std::chrono::high_resolution_clock::now();
-  std::string query = "rngnomadriv";
+  // std::string query = "rngnomadriv";
+  std::string query = "irqbypass.c";
   for (int i = 0; i < 99; i++) {
-    const vector<pair<float, int>> &results = idx.findSimilar(query, 2);
+    // const vector<pair<float, int>> &results = idx.findSimilar(query, 2);
+    const vector<pair<float, int>> &results = idx.findSim(query);
   }
 
-  const vector<pair<float, int>> &results = idx.findSimilar(query, 2);
+
+  // idx.findSim(query);
+
+  // const vector<pair<float, int>> &results = idx.findSimilar(query, 2);
+  const vector<pair<float, int>> &results = idx.findSim(query);
   auto search_time = std::chrono::high_resolution_clock::now();
   duration = search_time - start;
   cout << "Search time for 100 queries (seconds): " << duration.count() / 1000 << "\n";
@@ -94,6 +107,20 @@ int main() {
       break;
     }
   }
+
+    // std::cout << "Size of MyClass: " << sizeof(StrIdx::CharMap) << " bytes" << std::endl;
+    // std::cout << "Size of CharMap3: " << sizeof(StrIdx::CharMap3) << " bytes" << std::endl;
+    std::cout << "Size of CharNode: " << sizeof(StrIdx::CharNode) << " bytes" << std::endl;
+    std::cout << "Size of int: " << sizeof(int) << " bytes" << std::endl;
+
+  struct rusage usage;
+  getrusage(RUSAGE_SELF, &usage);
+  std::cout << "Maximum resident set size: " << usage.ru_maxrss << " kilobytes" << std::endl;
+  std::cout << "Integral shared memory size: " << usage.ru_ixrss << " kilobytes" << std::endl;
+  std::cout << "Integral unshared data size: " << usage.ru_idrss << " kilobytes" << std::endl;
+  std::cout << "Integral unshared stack size: " << usage.ru_isrss << " kilobytes" << std::endl;
+  
+  
 
   return 0;
 }

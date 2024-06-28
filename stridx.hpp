@@ -33,7 +33,7 @@ private:
 
 public:
   Output(int verb) : verboseLevel(verb) {}
-  Output() : Output(3) {}
+  Output() : Output(2) {}
   ~Output() = default;
   static void print() {}
 
@@ -62,42 +62,6 @@ public:
     printl(var2...);
   }
 };
-// 426000
-class CharMap {
-public:
-  std::map<char, CharMap> map;
-  std::vector<int> ids;
-
-  void addStr(std::string s, int id) { addStr(s, id, 0); }
-  void addStr(std::string s, int id, int level) {
-    if (level >= 8) {
-      return;
-    }
-    if (s.size() >= 1) {
-      char &c = s[0];
-      if (auto it = map.find(s[0]); it == map.end()) {
-        map[c] = CharMap{};
-      }
-      if (auto it = std::find(ids.begin(), ids.end(), id); it == map[c].ids.end()) {
-        map[c].ids.push_back(id);
-      }
-
-      map[c].addStr(s.substr(1, s.size() - 1), id, level + 1);
-    }
-  }
-
-  void debug() { debug(""); }
-  void debug(std::string trail) {
-    Output out;
-    for (const auto &[c, m] : map) {
-      // out.print(c);
-      map[c].debug(trail + c);
-    }
-    if (map.size() == 0) {
-      out.print(trail, "\n");
-    }
-  }
-};
 
 struct CharNode {
   int *ids;
@@ -122,9 +86,6 @@ struct CharNode {
     }
     return ret;
   }
-
-  // std::vector<int> ids ={};
-  // CharNode() : c(0), size(0), children(nullptr) {}
 };
 
 // typedef std::array<void *, 256> cArr;
@@ -147,7 +108,7 @@ public:
 
     CharNode *cn = root;
 
-    out.printl("add:", s);
+    out.printv(3,"add:", s,"\n");
 
     for (int i = 0; i < s.size() && i < 8; i++) {
       int c = ((char)s[i]);
@@ -182,18 +143,18 @@ public:
       }
 
       if (i == s.size() - 1 && true) {
-        out.print("i=", i, "s:", s.size(), "|");
+        out.printv(4,"i=", i, "s:", s.size(), "|");
         bool found = false;
         if (cn->ids_sz > 0) {
           for (int i = 0; i < cn->ids_sz; i++) {
             if (cn->ids[i] == id) {
               found = true;
-              out.printl("found:", id);
+              out.printv(3,"found:", id,"\n");
             }
           }
         }
         if (!found) {
-          out.print(".a.");
+          // out.print(".a.");
           auto x = new int[cn->ids_sz + 1];
           if (cn->ids_sz > 0) {
             memcpy(x, cn->ids, sizeof(int) * cn->ids_sz);
@@ -202,7 +163,7 @@ public:
           cn->ids = x;
           cn->ids[cn->ids_sz] = id;
           cn->ids_sz++;
-          out.print("sz:", cn->ids_sz, ",");
+          out.printv(3,"sz:", cn->ids_sz, ",");
         }
       }
 
@@ -648,7 +609,12 @@ public:
     return key;
   }
 
-  void findSim(std::string query) {
+std::vector<std::pair<float, int>> findSim(std::string query) {
+
+    CandMap fileCandMap;
+    auto &candmap = fileCandMap;
+    waitUntilDone();
+
     out.printl("------findsim-----");
     out.printl("query:", query);
     int last_start = query.size() - 2;
@@ -663,22 +629,50 @@ public:
         char c = s[i];
         CharNode *x = cn->find(c);
         if (x != nullptr) {
-          out.print(c, ":");
+          out.printv(3,c, ":");
           cn = x;
           // out.print("[", cn->ids_sz, "]");
           for (int j = 0; j < cn->ids_sz; j++) {
             out.print(cn->ids[j], ",");
+            PathSegment *p = seglist[cn->ids[j]];
+            addToResults(p, query, start, nchars, candmap);
           }
         } else {
           for (int j = 0; j < cn->ids_sz; j++) {
-            out.print(cn->ids[j], ";");
+            out.print(cn->ids[j], ";"); // TODO: remove?
           }
           break;
         }
       }
       out.printl(">");
     }
+
+    for (auto seg : segsToClean) {
+      seg->cand = nullptr;
+    }
+    segsToClean.clear();
+    
+        // Form return result, 2d array with file id's and scores
+    std::vector<std::pair<float, int>> results;
+    for (auto &[fid, cand] : fileCandMap) {
+      std::pair<float, int> v;
+      float sc = cand->getScore();
+      v.first = sc;
+      v.second = fid;
+      results.push_back(v);
+      delete cand;
+    }
+
+    // for (auto &[fid, cand] : dirCandMap) {
+      // delete cand;
+    // }
+
+    // Sort highest score first
+    std::sort(results.begin(), results.end(),
+              [](std::pair<float, int> a, std::pair<float, int> b) { return a.first > b.first; });
+
     out.printl("------findsim END-----");
+    return results;
   }
 
   void debug() {

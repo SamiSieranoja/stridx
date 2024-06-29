@@ -33,7 +33,7 @@ private:
 
 public:
   Output(int verb) : verboseLevel(verb) {}
-  Output() : Output(2) {}
+  Output() : Output(4) {}
   ~Output() = default;
   static void print() {}
 
@@ -71,6 +71,20 @@ struct CharNode {
   CharNode *children;
   CharNode() : ids(nullptr), ids_sz(0), c(0), size(0), children(nullptr) {}
 
+  std::set<int> getIds() {
+    std::set<int> set;
+    getIds(set);
+    return set;
+  }
+
+  void getIds(std::set<int> &set) {
+    for (int j = 0; j < ids_sz; j++) {
+      set.insert(ids[j]);
+    }
+    for (CharNode *it = children; it != children + size; it++) {
+      it->getIds(set);
+    }
+  }
   CharNode *find(char c) {
     bool found = false;
     CharNode *ret = nullptr;
@@ -100,15 +114,15 @@ public:
     root = new CharNode;
   }
 
-  void addStr(std::string s, int id) { addStr(s, id, 0); }
-  void addStr(std::string s, int id, int level) {
+  // void addStr(std::string s, int id) { addStr(s, id, 0); }
+  void addStr(std::string s, int id) {
     if (s.size() < 2) {
       return;
     }
 
     CharNode *cn = root;
 
-    out.printv(3,"add:", s,"\n");
+    out.printv(3, "add:", s, "\n");
 
     for (int i = 0; i < s.size() && i < 8; i++) {
       int c = ((char)s[i]);
@@ -143,13 +157,13 @@ public:
       }
 
       if (i == s.size() - 1 && true) {
-        out.printv(4,"i=", i, "s:", s.size(), "|");
+        out.printv(4, "i=", i, "s:", s.size(), "|");
         bool found = false;
         if (cn->ids_sz > 0) {
           for (int i = 0; i < cn->ids_sz; i++) {
             if (cn->ids[i] == id) {
               found = true;
-              out.printv(3,"found:", id,"\n");
+              out.printv(3, "found:", id, "\n");
             }
           }
         }
@@ -163,7 +177,7 @@ public:
           cn->ids = x;
           cn->ids[cn->ids_sz] = id;
           cn->ids_sz++;
-          out.printv(3,"sz:", cn->ids_sz, ",");
+          out.printv(3, "sz:", cn->ids_sz, ",");
         }
       }
 
@@ -242,7 +256,7 @@ std::vector<std::string> splitString(const std::string &input, const char &separ
 }
 
 // Debug
-void printVector(const std::vector<int> &vec) {
+void printVector(const std::vector<float> &vec) {
   for (const auto &value : vec) {
     std::cout << value << " ";
   }
@@ -353,6 +367,7 @@ private:
   std::vector<PathSegment *> segsToClean;
 
   std::unordered_map<int, PathSegment *> seglist;
+  std::unordered_map<int, PathSegment *> seglist_dir;
   std::mutex seglist_mu;
 
   PathSegment *root;
@@ -360,11 +375,12 @@ private:
   float dirWeight = 0.7; // Give only 70% of score if match is for a directory
 
   std::unique_ptr<ThreadPool> pool;
-  Output out{1}; // verbose level = 1
+  Output out{4}; // verbose level = 1
   std::mutex cm_mu;
 
 public:
-  CharMap3 cm;
+  CharMap3 cm;     // for files
+  CharMap3 cm_dir; // for directories
   StringIndex(char sep) : dirSeparator(sep) {
     root = new PathSegment();
     root->parent = nullptr;
@@ -476,7 +492,7 @@ public:
       if (auto it = prev->children.find(x); it != prev->children.end()) {
         p = it->second;
         prev->mu.unlock();
-      } else {
+      } else { // File or dir not included in tree yet
         p = new PathSegment(x, fileId);
         p->parent = prev;
         // If this is last item in segs, then it is a file.
@@ -493,12 +509,22 @@ public:
         } else { // otherwise, it is a directory
           p->type = segmentType::Dir;
           p->fileId = dirId;
+          seglist_dir[dirId] = p;
+
+          // TODO: Create a function
+          for (int i = 0; i < x.size() + 1; i++) {
+            auto s = x.substr(i, std::min(static_cast<size_t>(8), x.size() - i));
+            cm_dir.addStr(s, dirId);
+          }
+
           // Files use user input Id. Directories need to have it generated
           dirId++;
         }
         prev->children[x] = p;
         prev->mu.unlock();
-        // addPathSegmentKeys(p);
+        if (p->type != segmentType::Dir) {
+          addPathSegmentKeys(p);
+        }
       }
 
       prev = p;
@@ -609,7 +635,7 @@ public:
     return key;
   }
 
-std::vector<std::pair<float, int>> findSim(std::string query) {
+  std::vector<std::pair<float, int>> findSim(std::string query) {
 
     CandMap fileCandMap;
     auto &candmap = fileCandMap;
@@ -629,13 +655,24 @@ std::vector<std::pair<float, int>> findSim(std::string query) {
         char c = s[i];
         CharNode *x = cn->find(c);
         if (x != nullptr) {
-          out.printv(3,c, ":");
+          out.print("[", c, "]");
+          // out.print(3, c, "z:");
           cn = x;
           // out.print("[", cn->ids_sz, "]");
+          // Consider scores only for substrings with size >= 2
+          if (i > 0) {
+            std::set<int> ids = cn->getIds();
+            for (const int &y : ids) {
+              out.print(y, ",");
+              PathSegment *p = seglist[y];
+              addToResults(p, query, start, i + 1, candmap);
+            }
+          }
+          // out.printv(3, ids);
           for (int j = 0; j < cn->ids_sz; j++) {
-            out.print(cn->ids[j], ",");
-            PathSegment *p = seglist[cn->ids[j]];
-            addToResults(p, query, start, nchars, candmap);
+            // out.print(cn->ids[j], ",");
+            // PathSegment *p = seglist[cn->ids[j]];
+            // addToResults(p, query, start, nchars, candmap);
           }
         } else {
           for (int j = 0; j < cn->ids_sz; j++) {
@@ -651,20 +688,23 @@ std::vector<std::pair<float, int>> findSim(std::string query) {
       seg->cand = nullptr;
     }
     segsToClean.clear();
-    
-        // Form return result, 2d array with file id's and scores
+
+    // Form return result, 2d array with file id's and scores
     std::vector<std::pair<float, int>> results;
     for (auto &[fid, cand] : fileCandMap) {
       std::pair<float, int> v;
       float sc = cand->getScore();
       v.first = sc;
+      out.print("|", sc, ":");
+      printVector(cand->v_charscore);
+      out.print("|");
       v.second = fid;
       results.push_back(v);
       delete cand;
     }
 
     // for (auto &[fid, cand] : dirCandMap) {
-      // delete cand;
+    // delete cand;
     // }
 
     // Sort highest score first

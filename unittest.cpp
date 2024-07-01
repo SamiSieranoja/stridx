@@ -3,6 +3,8 @@
 #include "stridx.hpp"
 #include <cmath>
 #include <memory>
+#include <chrono>
+#include <thread>
 
 TEST(SplitString, MatchSize) {
   std::vector<std::string> svec = StrIdx::splitString("foo/bar/test1.txt", '/');
@@ -13,7 +15,8 @@ TEST(SplitString, MatchSize) {
   }
 }
 
-std::vector<std::string> flist{"./drivers/char/hw_random/nomadik-rng.c",
+std::vector<std::string> flist{
+                               "./drivers/char/hw_random/nomadik-rng.c",
                                "./drivers/pinctrl/nomadik",
                                "./drivers/clk/clk-nomadik.c",
                                "./drivers/gpio/gpio-nomadik.c",
@@ -24,17 +27,37 @@ std::vector<std::string> flist{"./drivers/char/hw_random/nomadik-rng.c",
                                "./drivers/pinctrl/nomadik/pinctrl-nomadik.c",
                                "./drivers/input/keyboard/nomadik-ske-keypad.c",
                                "./drivers/pinctrl/nomadik/pinctrl-nomadik-db8500.c",
-                               "./drivers/pinctrl/nomadik/pinctrl-nomadik-stn8815.c",
+                               "./drivers/pinctrl/nomadik/pinctrl-nomadik-stn8816.c",
                                "./drivers/char/hw_random/omap-rng.c",
                                "./drivers/char/hw_random/omap3-rom-rng.c",
                                "./include/dt-bindings/pinctrl/nomadik.h",
                                "./Documentation/devicetree/bindings/arm/ste-nomadik.txt"};
 
-std::vector<float> target_scores{0.342944, 0.271396, 0.271126, 0.270893, 0.270431, 0.270355,
+std::vector<float> target_scores{0.342944, 0.271396,  0.271126, 0.270893, 0.270431, 0.270355,
                                  0.270088, 0.270088, 0.26987,  0.269776, 0.269574, 0.269538,
                                  0.236358, 0.236074, 0.224804, 0.224238};
 
-void scoreTest(bool threaded) {
+void createIndex(bool threaded) {
+
+  StrIdx::StringIndex idx('/'); // Separate directories using unix style "/" char
+  std::string query = "rngnomadriv";
+
+  int i = 1;
+  for (const auto &str : flist) {
+    if (threaded && i > 2) {
+      idx.addStrToIndexThreaded(str, i);
+    } else {
+      idx.addStrToIndex(str, i);
+    }
+    i++;
+  }
+
+  idx.waitUntilReady();
+
+  EXPECT_EQ(idx.size(), 16);
+}
+
+void scoreTest(bool threaded, bool runSearch) {
 
   StrIdx::StringIndex idx('/'); // Separate directories using unix style "/" char
   std::string query = "rngnomadriv";
@@ -48,22 +71,41 @@ void scoreTest(bool threaded) {
     }
     i++;
   }
-  const std::vector<std::pair<float, int>> &results = idx.findSimilar(query);
 
-  std::cout << results[0].first;
-  EXPECT_EQ(results[0].second, 1);
-  if (results.size() == 16) {
-    int i = 0;
-    for (const auto &res : results) {
-      // Check if first five digits of the scores match
-      EXPECT_EQ(std::floor(res.first * 1e5), std::floor(1e5 * target_scores[i]));
-      i++;
+  idx.waitUntilReady();
+  std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+  std::cout << "s:" << idx.size() << ":";
+  EXPECT_EQ(idx.size(), 16);
+
+  if (runSearch) {
+    const std::vector<std::pair<float, int>> &results = idx.findSimilar(query);
+
+    std::cout << results[0].first;
+    EXPECT_EQ(results[0].second, 1);
+    if (results.size() == 16) {
+      int i = 0;
+      for (const auto &res : results) {
+        // Check if first five digits of the scores match
+        std::cout<< "{" << res.first << " " << target_scores[i] << "\n";
+        EXPECT_EQ(std::floor(res.first * 1e5), std::floor(1e5 * target_scores[i]));
+        i++;
+      }
     }
   }
+  
+  // EXPECT_EQ(0,1);
 }
 
-TEST(IndexSearch, MatchingScoresSingleThread) { scoreTest(false); }
-TEST(IndexSearch, MatchingScoresThreaded) { scoreTest(true); }
+TEST(Index, Create) { createIndex(false); }
+TEST(Index, CreateThreaded) { createIndex(true); }
+TEST(IndexSearch, MatchingScoresSingleThread) {
+  scoreTest(false, true);
+}
+TEST(IndexSearch, MatchingScoresThreaded) {
+  for (int i = 0; i < 3; i++) {
+    scoreTest(true, true);
+  }
+}
 
 class IndexTest : public testing::Test {
 protected:

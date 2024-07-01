@@ -98,6 +98,7 @@ module StrIdx
       }
 
       t.join
+      File.delete(sockfn)
     end
   end
 end

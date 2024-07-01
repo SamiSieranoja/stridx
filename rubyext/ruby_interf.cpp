@@ -59,8 +59,8 @@ VALUE StringIndexFind(VALUE self, VALUE str) {
   StrIdx::StringIndex *idx = (StrIdx::StringIndex *)data;
 
   ret = rb_ary_new();
-  const std::vector<std::pair<float, int>> &results = idx->findSimilar(s1, 2);
-  int limit = 15;
+  const std::vector<std::pair<float, int>> &results = idx->findSimilar(s1);
+  int limit = 40;
   int i = 0;
   for (const auto &res : results) {
     VALUE arr = rb_ary_new();

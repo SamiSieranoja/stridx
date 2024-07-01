@@ -61,7 +61,14 @@ stridx.rb start -- ~/Documents/ ~/Pictures/
 Add bash keybindings (Ctrl-t):
 ```
 eval "$(stridx.rb bash)"
+
 ```
+
+To autostart server, add following line to .bashrc:
+```
+[ ! -f ~/.stridx/sock ] && stridx.rb start -- ~/Documents/ ~/Pictures/
+```
+
 
 Search by pressing <kbd>ctrl</kbd>+<kbd>t</kbd>.  Keys: <kbd>up</kbd>, <kbd>down</kbd>, select with <kbd>enter</kbd>
 

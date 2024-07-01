@@ -102,28 +102,22 @@ struct CharNode {
 
 /* Tree type data structure consisting of strings of file path segments
  *  (somewhat like a trie)
- * Example, Adding one input string "abracadabr4" will add the following (size 2..8 char) substrings:
- abracada
- bracadab
- racadabr
- acadabr4
- dabr4
- abr4
- br4
- ra
-
-Which forms a tree like structure:
-[root]-a-b-r-a-c-a-d-a
-   |   |   ╰-4
-   |   ╰─c-a-d-a-b-r-4
-   ╰───b-r-a-c-a-d-a-b
-   |     ╰─4
-   ╰───r-a-c-a-d-a-b-r
-   ╰───d-a-b-r-4
-
-Id's pointing to path segments are stored in nodes that match the end of the inserted substring
-
-This data structure is the main bottleneck in terms of memory consumption.
+ * For example, Adding one input string "abracadabr4" will add the following (size 2..8 char)
+ * substrings: abracada bracadab racadabr acadabr4 dabr4 abr4 br4 ra
+ * (CharTree::addStr callled for each separately)
+ *
+ * Which forms a tree like structure:
+ * [root]-a-b-r-a-c-a-d-a
+ *    |   |   ╰-4
+ *    |   ╰─c-a-d-a-b-r-4
+ *    ╰───b-r-a-c-a-d-a-b
+ *    |     ╰─4
+ *    ╰───r-a-c-a-d-a-b-r
+ *    ╰───d-a-b-r-4
+ *
+ * Id's pointing to path segments are stored in nodes that match the end of the inserted substring
+ *
+ * This data structure is the main bottleneck in terms of memory consumption.
  */
 class CharTree {
   Output out;
@@ -132,9 +126,7 @@ class CharTree {
 public:
   CharNode *root;
 
-  CharTree() {
-    root = new CharNode;
-  }
+  CharTree() { root = new CharNode; }
 
   void addStr(std::string s, int id) {
     if (s.size() < 2) {
@@ -143,9 +135,8 @@ public:
 
     CharNode *cn = root;
 
-
-
     std::lock_guard<std::mutex> mu_lock(mu);
+
     for (int i = 0; i < s.size() && i < 8; i++) {
       int c = ((char)s[i]);
       bool found = false;
@@ -162,13 +153,10 @@ public:
         }
       }
       if (!found) {
-        // out.printl("NF");
         auto x = new CharNode[cn->size + 1];
         if (cn->size > 0) {
-          // out.printl("size > 0");
           memcpy(x, cn->children, sizeof(CharNode) * (cn->size));
           delete[] cn->children;
-          // free(cn->children);
         }
         cn->children = x;
         CharNode *nn = &(cn->children[cn->size]);
@@ -202,7 +190,7 @@ public:
         }
       }
 
-    } // for
+    } // END for
   }
 
   void debug() { debug("", root); }
@@ -228,13 +216,6 @@ public:
     }
   }
 
-  // for (const auto &[c, m] : map) {
-  // out.print(c);
-  // map[c].debug(trail + c);
-  // }
-  // if (map.size() == 0) {
-  // out.print(trail, "\n");
-  // }
 };
 
 // Transforms input string as follows:
@@ -416,7 +397,6 @@ public:
     // We don't seem to get any benefit from more than 6 threads even if the hardware supports it
     int num_threads = std::max((int)std::thread::hardware_concurrency(), 4);
     num_threads = std::min(num_threads, 6);
-    num_threads = 1;
     out.printv(2, "Number of threads: ", num_threads);
     pool = std::unique_ptr<ThreadPool>(new ThreadPool(num_threads));
   }
@@ -729,7 +709,7 @@ public:
       delete cand;
     }
 
-		//TODO:
+    // TODO:
     // for (auto &[fid, cand] : dirCandMap) {
     // delete cand;
     // }

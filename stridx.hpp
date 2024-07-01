@@ -71,6 +71,7 @@ struct CharNode {
   CharNode *children;
   CharNode() : ids(nullptr), ids_sz(0), c(0), size(0), children(nullptr) {}
 
+  // Gets Id's stored in this node and all child nodes combined
   std::set<int> getIds() {
     std::set<int> set;
     getIds(set);
@@ -99,20 +100,42 @@ struct CharNode {
   }
 };
 
-// typedef std::array<void *, 256> cArr;
-class CharMap {
+/* Tree type data structure consisting of strings of file path segments
+ *  (somewhat like a trie)
+ * Example, Adding one input string "abracadabr4" will add the following (size 2..8 char) substrings:
+ abracada
+ bracadab
+ racadabr
+ acadabr4
+ dabr4
+ abr4
+ br4
+ ra
+
+Which forms a tree like structure:
+[root]-a-b-r-a-c-a-d-a
+   |   |   ╰-4
+   |   ╰─c-a-d-a-b-r-4
+   ╰───b-r-a-c-a-d-a-b
+   |     ╰─4
+   ╰───r-a-c-a-d-a-b-r
+   ╰───d-a-b-r-4
+
+Id's pointing to path segments are stored in nodes that match the end of the inserted substring
+
+This data structure is the main bottleneck in terms of memory consumption.
+ */
+class CharTree {
   Output out;
   std::mutex mu;
 
 public:
   CharNode *root;
 
-  CharMap() {
-    // std::fill(map.begin(), map.end(), nullptr);
+  CharTree() {
     root = new CharNode;
   }
 
-  // void addStr(std::string s, int id) { addStr(s, id, 0); }
   void addStr(std::string s, int id) {
     if (s.size() < 2) {
       return;
@@ -120,12 +143,11 @@ public:
 
     CharNode *cn = root;
 
-    out.printv(3, "add:", s, "\n");
+
 
     std::lock_guard<std::mutex> mu_lock(mu);
     for (int i = 0; i < s.size() && i < 8; i++) {
       int c = ((char)s[i]);
-      // out.printl("ii:", i, " ", static_cast<char>(c), "|", (int)cn->size);
       bool found = false;
 
       if (cn->size > 0) {
@@ -374,12 +396,12 @@ private:
   float dirWeight = 0.7; // Give only 70% of score if match is for a directory
 
   std::unique_ptr<ThreadPool> pool;
-  Output out{4}; // verbose level = 1
+  Output out{1}; // verbose level = 1
   std::mutex cm_mu;
 
 public:
-  CharMap cm;     // for files
-  CharMap cm_dir; // for directories
+  CharTree cm;     // for files
+  CharTree cm_dir; // for directories
   StringIndex(char sep) : dirSeparator(sep) {
     root = new PathSegment();
     root->parent = nullptr;
@@ -493,7 +515,6 @@ public:
       // this part of the path already exists in the tree
       if (auto it = prev->children.find(x); it != prev->children.end()) {
         p = it->second;
-        out.print("[", x, ",", p, ",exists]");
         prev->mu.unlock();
       } else { // File or dir not included in tree yet
         p = new PathSegment(x, fileId);
@@ -507,7 +528,6 @@ public:
           {
             std::lock_guard<std::mutex> guard(seglist_mu);
             seglist[fileId] = p;
-            out.print("segadd:", fileId, "|", x, "]");
 
             for (int i = 0; i < x.size() + 1; i++) {
               auto s = x.substr(i, std::min(static_cast<size_t>(8), x.size() - i));
@@ -538,7 +558,6 @@ public:
 
       prev = p;
     }
-    // out.printv(0, "add done", fileId, " ", seglist.size(), "|");
   }
 
   std::string getString(int id) {
@@ -550,9 +569,9 @@ public:
     while (seg->parent->parent != nullptr) {
       seg = seg->parent;
       s = seg->str + dirSeparator + s;
-      out.print(seg, "(", seg->str, ")", ",");
+      // out.print(seg, "(", seg->str, ")", ",");
     }
-    out.printl(s);
+    // out.printl(s);
 
     return s;
   }
@@ -647,7 +666,7 @@ public:
     return key;
   }
 
-  void searchCharTree(const std::string &query, CandMap &candmap, CharMap &chartr) {
+  void searchCharTree(const std::string &query, CandMap &candmap, CharTree &chartr) {
 
     int last_start = query.size() - 2;
     for (int start = 0; start <= last_start; start++) {
@@ -656,46 +675,30 @@ public:
       int nchars = end - start + 1;
       std::string s = query.substr(start, nchars);
 
-      // out.print("s:|", s, "|");
       for (int i = 0; i < s.size(); i++) {
         char c = s[i];
         CharNode *x = cn->find(c);
         if (x != nullptr) {
-          // out.print("[", c, "]");
-          // out.print(3, c, "z:");
           cn = x;
-          // out.print("[", cn->ids_sz, "]");
           // Consider scores only for substrings with size >= 2
           if (i > 0) {
             std::set<int> ids = cn->getIds();
             for (const int &y : ids) {
-              // out.print(y, ",");
               PathSegment *p = nullptr;
               if (&chartr == &cm) {
                 p = seglist[y];
-                // out.printl("file");
               } else {
                 p = seglist_dir[y];
-                // out.printl("dir");
               }
               assert(p != nullptr);
               addToResults(p, query, start, i + 1, candmap);
             }
           }
-          // out.printv(3, ids);
-          for (int j = 0; j < cn->ids_sz; j++) {
-            // out.print(cn->ids[j], ",");
-            // PathSegment *p = seglist[cn->ids[j]];
-            // addToResults(p, query, start, nchars, candmap);
-          }
         } else {
-          for (int j = 0; j < cn->ids_sz; j++) {
-            // out.print(cn->ids[j], ";"); // TODO: remove?
-          }
+          // assert(cn->ids_sz < 1); // TODO: should not come here?
           break;
         }
       }
-      // out.printl(">");
     }
   }
 
@@ -706,8 +709,6 @@ public:
     auto &candmap = fileCandMap;
     waitUntilDone();
 
-    // out.printl("------findsim-----");
-    out.printl("query:", query);
     searchCharTree(query, fileCandMap, cm);
     searchCharTree(query, dirCandMap, cm_dir);
     mergeCandidateMaps(fileCandMap, dirCandMap);
@@ -723,14 +724,12 @@ public:
       std::pair<float, int> v;
       float sc = cand->getScore();
       v.first = sc;
-      out.print("|", sc, ":");
-      printVector(cand->v_charscore);
-      out.print("|");
       v.second = fid;
       results.push_back(v);
       delete cand;
     }
 
+		//TODO:
     // for (auto &[fid, cand] : dirCandMap) {
     // delete cand;
     // }
@@ -739,7 +738,6 @@ public:
     std::sort(results.begin(), results.end(),
               [](std::pair<float, int> a, std::pair<float, int> b) { return a.first > b.first; });
 
-    // out.printl("------findsim END-----");
     return results;
   }
 
@@ -873,21 +871,19 @@ private:
   void mergeCandidateMaps(CandMap &fileCandMap, CandMap &dirCandMap) {
 
     for (auto &[fid, cand] : fileCandMap) {
-      out.print("seg:", cand->seg->str, ">");
       PathSegment *p = cand->seg->parent;
       while (p->parent != nullptr) {
         if (p->cand != nullptr) {
-          out.print(".", p->str, "(", p, ")", ".");
 
           auto &scoreA = cand->v_charscore;
           auto &scoreB = p->cand->v_charscore;
 
-          out.print("[");
-          printVector(scoreA);
-          out.print(",");
-          printVector(scoreB);
-          out.print(",");
-          out.print("]");
+          // out.print("[");
+          // printVector(scoreA);
+          // out.print(",");
+          // printVector(scoreB);
+          // out.print(",");
+          // out.print("]");
           for (int i = 0; i < cand->len; i++) {
             if (scoreA[i] < scoreB[i] * dirWeight) {
               scoreA[i] = scoreB[i] * dirWeight;
@@ -896,7 +892,6 @@ private:
         }
         p = p->parent;
       }
-      out.print("\n");
     }
   }
 
@@ -904,7 +899,7 @@ private:
 
     if (auto it2 = candmap.find(seg->fileId); it2 == candmap.end()) {
       Candidate *cand = new Candidate(seg, str.size());
-      out.printl("new cand:", seg->str, ",", seg, ",", seg->parent, ",", seg->parent->parent);
+      // out.printl("new cand:", seg->str, ",", seg, ",", seg->parent, ",", seg->parent->parent);
       segsToClean.push_back(seg);
       candmap[seg->fileId] = cand;
       seg->cand = cand;

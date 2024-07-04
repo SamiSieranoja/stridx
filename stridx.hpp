@@ -86,6 +86,8 @@ struct CharNode {
       it->getIds(set);
     }
   }
+
+  // Find if character 'c' is included in children of the node
   CharNode *find(char c) {
     CharNode *ret = nullptr;
     if (size > 0) {
@@ -117,7 +119,10 @@ struct CharNode {
  *
  * Id's pointing to path segments are stored in nodes that match the end of the inserted substring
  *
- * This data structure is the main bottleneck in terms of memory consumption.
+ * This data structure (CharTree/CharNode) is the main bottleneck in terms of memory consumption.
+ * For a dataset of 84k files with 3.5 million characters there will be about 2.3 million CharNodes.
+ * Therefore, having std::vector's or similar structures with memory overhead is not really an
+ * option.
  */
 class CharTree {
   Output out;
@@ -215,7 +220,6 @@ public:
       }
     }
   }
-
 };
 
 // Transforms input string as follows:
@@ -540,11 +544,20 @@ public:
     }
   }
 
-  std::string getString(int id) {
+  std::string getString(int id) { return getString(id, false); }
+
+  // Reconstruct original filepath from segments
+  std::string getString(int id, bool isDir) {
     std::string s = "";
     std::lock_guard<std::mutex> guard(seglist_mu);
 
-    PathSegment *seg = seglist[id];
+    PathSegment *seg = nullptr;
+
+    if (isDir) {
+      seg = seglist_dir[id];
+    } else {
+      seg = seglist[id];
+    }
     s += seg->str;
     while (seg->parent->parent != nullptr) {
       seg = seg->parent;
@@ -604,7 +617,7 @@ public:
 
     /* If parent dir of a file matches the input string add the scores of the direcotry to the
      scores of the file */
-    mergeCandidateMaps(fileCandMap, dirCandMap);
+    addParentScores(fileCandMap);
 
     // Set all candidate pointers to nullptr so they won't mess up future searches
     for (auto seg : segsToClean) {
@@ -682,25 +695,10 @@ public:
     }
   }
 
-  std::vector<std::pair<float, int>> findSimilar(std::string query) {
-
-    CandMap fileCandMap;
-    CandMap dirCandMap;
-    auto &candmap = fileCandMap;
-    waitUntilDone();
-
-    searchCharTree(query, fileCandMap, cm);
-    searchCharTree(query, dirCandMap, cm_dir);
-    mergeCandidateMaps(fileCandMap, dirCandMap);
-
-    for (auto seg : segsToClean) {
-      seg->cand = nullptr;
-    }
-    segsToClean.clear();
-
+  std::vector<std::pair<float, int>> candidatesToVec(CandMap &candmap) {
     // Form return result, 2d array with file id's and scores
     std::vector<std::pair<float, int>> results;
-    for (auto &[fid, cand] : fileCandMap) {
+    for (auto &[fid, cand] : candmap) {
       std::pair<float, int> v;
       float sc = cand->getScore();
       v.first = sc;
@@ -717,6 +715,76 @@ public:
     // Sort highest score first
     std::sort(results.begin(), results.end(),
               [](std::pair<float, int> a, std::pair<float, int> b) { return a.first > b.first; });
+    return results;
+  }
+
+  std::vector<std::pair<float, int>> findDirectories(std::string query) {
+    CandMap dirCandMap;
+    auto &candmap = dirCandMap;
+    waitUntilDone();
+
+    searchCharTree(query, dirCandMap, cm_dir);
+    addParentScores(dirCandMap);
+    auto results = candidatesToVec(dirCandMap);
+    return results;
+  }
+
+  std::vector<std::pair<float, std::string>> findFilesAndDirectories(std::string query) {
+
+    CandMap fileCandMap;
+    CandMap dirCandMap;
+    auto &candmap = fileCandMap;
+    waitUntilDone();
+
+    searchCharTree(query, fileCandMap, cm);
+    searchCharTree(query, dirCandMap, cm_dir);
+    addParentScores(fileCandMap);
+    addParentScores(dirCandMap);
+
+    for (auto seg : segsToClean) {
+      seg->cand = nullptr;
+    }
+    segsToClean.clear();
+
+    auto res_file = candidatesToVec(fileCandMap);
+    auto res_dir = candidatesToVec(dirCandMap);
+    std::vector<std::pair<float, std::string>> results;
+    for (const auto &[score, id] : res_file) {
+      results.push_back(std::pair<float, std::string>{score, getString(id)});
+    }
+    for (const auto &[score, id] : res_dir) {
+      results.push_back(std::pair<float, std::string>{score, getString(id, true)});
+    }
+
+    // std::sort(results.begin(), results.end());
+    // Sort highest score first
+    std::sort(results.begin(), results.end(),
+              [](std::pair<float, std::string> a, std::pair<float, std::string> b) {
+                return a.first > b.first;
+              });
+    return results;
+  }
+
+  // TODO: delete?
+  std::vector<std::pair<float, int>> findSimilar(std::string query) { return findFiles(query); }
+
+  std::vector<std::pair<float, int>> findFiles(std::string query) {
+
+    CandMap fileCandMap;
+    CandMap dirCandMap;
+    auto &candmap = fileCandMap;
+    waitUntilDone();
+
+    searchCharTree(query, fileCandMap, cm);
+    searchCharTree(query, dirCandMap, cm_dir);
+    addParentScores(fileCandMap);
+
+    for (auto seg : segsToClean) {
+      seg->cand = nullptr;
+    }
+    segsToClean.clear();
+
+    auto results = candidatesToVec(fileCandMap);
 
     return results;
   }
@@ -848,7 +916,7 @@ private:
   }
 
   // Add parent directories scores to files
-  void mergeCandidateMaps(CandMap &fileCandMap, CandMap &dirCandMap) {
+  void addParentScores(CandMap &fileCandMap) {
 
     for (auto &[fid, cand] : fileCandMap) {
       PathSegment *p = cand->seg->parent;

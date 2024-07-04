@@ -730,33 +730,54 @@ public:
   }
 
   std::vector<std::pair<float, std::string>> findFilesAndDirectories(std::string query) {
+    return findFilesAndDirectories(query, true, true);
+  }
+
+  std::vector<std::pair<float, std::string>>
+  findFilesAndDirectories(std::string query, bool includeFiles, bool includeDirs) {
 
     CandMap fileCandMap;
     CandMap dirCandMap;
     auto &candmap = fileCandMap;
     waitUntilDone();
+    std::vector<std::pair<float, std::string>> results;
 
-    searchCharTree(query, fileCandMap, cm);
-    searchCharTree(query, dirCandMap, cm_dir);
-    addParentScores(fileCandMap);
-    addParentScores(dirCandMap);
+    if (includeFiles) {
+      searchCharTree(query, fileCandMap, cm);
+    }
+
+    if (includeDirs) {
+      searchCharTree(query, dirCandMap, cm_dir);
+    }
+
+    if (includeFiles) {
+      addParentScores(fileCandMap);
+    }
+
+    if (includeDirs) {
+      addParentScores(dirCandMap);
+    }
 
     for (auto seg : segsToClean) {
       seg->cand = nullptr;
     }
     segsToClean.clear();
 
-    auto res_file = candidatesToVec(fileCandMap);
-    auto res_dir = candidatesToVec(dirCandMap);
-    std::vector<std::pair<float, std::string>> results;
-    for (const auto &[score, id] : res_file) {
-      results.push_back(std::pair<float, std::string>{score, getString(id)});
-    }
-    for (const auto &[score, id] : res_dir) {
-      results.push_back(std::pair<float, std::string>{score, getString(id, true)});
+    if (includeDirs) {
+      auto res_dir = candidatesToVec(dirCandMap);
+      for (const auto &[score, id] : res_dir) {
+        results.push_back(std::pair<float, std::string>{score, getString(id, true)});
+      }
     }
 
-    // std::sort(results.begin(), results.end());
+    if (includeFiles) {
+      auto res_file = candidatesToVec(fileCandMap);
+      std::vector<std::pair<float, std::string>> results;
+      for (const auto &[score, id] : res_file) {
+        results.push_back(std::pair<float, std::string>{score, getString(id)});
+      }
+    }
+
     // Sort highest score first
     std::sort(results.begin(), results.end(),
               [](std::pair<float, std::string> a, std::pair<float, std::string> b) {

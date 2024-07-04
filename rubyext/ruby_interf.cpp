@@ -75,6 +75,60 @@ VALUE StringIndexFind(VALUE self, VALUE str) {
   return ret;
 }
 
+VALUE StringIndexFindFilesAndDirs(VALUE self, VALUE str) {
+  VALUE ret;
+  std::string s1 = StringValueCStr(str);
+
+  void *data;
+  TypedData_Get_Struct(self, int, &str_idx_type, data);
+  StrIdx::StringIndex *idx = (StrIdx::StringIndex *)data;
+
+  ret = rb_ary_new();
+  const std::vector<std::pair<float, std::string>> &results = idx->findFilesAndDirectories(s1);
+  int limit = 40;
+  int i = 0;
+  for (const auto &res : results) {
+    VALUE arr = rb_ary_new();
+    rb_ary_push(arr, rb_str_new_cstr(res.second.c_str()));
+    rb_ary_push(arr, DBL2NUM(res.first));
+    rb_ary_push(ret, arr);
+    i++;
+    if (i >= limit) {
+      break;
+    }
+  }
+  return ret;
+}
+
+VALUE StringIndexFindDirs(VALUE self, VALUE str) {
+  VALUE ret;
+  std::string s1 = StringValueCStr(str);
+
+  void *data;
+  TypedData_Get_Struct(self, int, &str_idx_type, data);
+  StrIdx::StringIndex *idx = (StrIdx::StringIndex *)data;
+
+  ret = rb_ary_new();
+  const std::vector<std::pair<float, std::string>> &results = idx->findFilesAndDirectories(s1,false,true);
+  int limit = 40;
+  int i = 0;
+  for (const auto &res : results) {
+    VALUE arr = rb_ary_new();
+    rb_ary_push(arr, rb_str_new_cstr(res.second.c_str()));
+    rb_ary_push(arr, DBL2NUM(res.first));
+    rb_ary_push(ret, arr);
+    i++;
+    if (i >= limit) {
+      break;
+    }
+  }
+  return ret;
+}
+
+
+
+
+
 VALUE StringIndexSetDirSeparator(VALUE self, VALUE str) {
   char c = '/';
   if (TYPE(str) == T_STRING) {
@@ -104,6 +158,8 @@ void Init_stridx(void) {
   rb_define_method(classStringIndex, "add", StringIndexAddSegments, 2);
   rb_define_method(classStringIndex, "waitUntilDone", StringIndexWaitUntilDone, 0);
   rb_define_method(classStringIndex, "find", StringIndexFind, 1);
+  rb_define_method(classStringIndex, "findFilesAndDirs", StringIndexFindFilesAndDirs, 1);
+  rb_define_method(classStringIndex, "findDirs", StringIndexFindDirs, 1);
   
   rb_define_method(classStringIndex, "setDirSeparator", StringIndexSetDirSeparator, 1);
   

@@ -63,6 +63,8 @@ public:
   }
 };
 
+Output out{1};
+
 struct CharNode {
   int *ids;
   int ids_sz;
@@ -138,6 +140,7 @@ public:
       return;
     }
 
+    // out.printl("add str:",s);
     CharNode *cn = root;
 
     std::lock_guard<std::mutex> mu_lock(mu);
@@ -224,17 +227,33 @@ public:
 
 // Transforms input string as follows:
 // '/foo/bar/file1.txt'
-// => vector{"foo", "bar", "file1.txt"}
-std::vector<std::string> splitString(const std::string &input, const char &separator) {
-  std::vector<std::string> result;
-  std::stringstream ss(input);
-  std::string item;
+// => vector{"/foo", "/bar", "/file1.txt"}
 
-  while (std::getline(ss, item, separator)) {
-    if (item.size() > 0) {
-      result.push_back(item);
+std::vector<std::string> splitString(const std::string &str, char delimiter) {
+  std::vector<std::string> result;
+  std::string part;
+
+  for (char ch : str) {
+    if (ch == delimiter) {
+      if (part.size() > 0) {
+        result.push_back(part);
+      }
+      part.clear(); // Start a new part
+      part += ch;
+    } else {
+      part += ch;
     }
   }
+
+  // If there's any remaining part after the loop, add it to the result
+  if (!part.empty()) {
+    result.push_back(part);
+  }
+
+  // for (const auto &value : result) {
+  // std::cout << value << "|";
+  // }
+  // std::cout << std::endl;
 
   return result;
 }
@@ -300,9 +319,9 @@ struct PathSegment {
   [[nodiscard]] int size() const {
     int sz = str.size();
     PathSegment *cur = parent;
-    // Sum up length of parent segments (+1 for divisors)
+    // Sum up length of parent segments
     while (cur->parent != nullptr) {
-      sz += cur->str.size() + 1;
+      sz += cur->str.size();
       cur = cur->parent;
     }
     return sz;
@@ -341,6 +360,7 @@ struct Candidate {
     float div2 = len * candLen;
     float score1 = score / div;
     float score2 = score / div2;
+    // out.printl("str:",seg->str," len:",len," candLen:", candLen, " score:", score);
 
     score = score1 * 0.97 + score2 * 0.03;
     return score;
@@ -480,6 +500,7 @@ public:
     } else {
       // Split path to segments
       segs = splitString(filePath, separator);
+      // segs = splitStringOLD(filePath, separator);
     }
 
     PathSegment *prev = nullptr;
@@ -504,10 +525,7 @@ public:
         p = new PathSegment(x, fileId);
         p->parent = prev;
         // If this is last item in segs, then it is a file.
-        // out.print("[not exists]");
         if (_x == std::prev(segs.end())) {
-          // out.print("[last]");
-
           p->type = segmentType::File;
           {
             std::lock_guard<std::mutex> guard(seglist_mu);
@@ -521,6 +539,11 @@ public:
         } else { // otherwise, it is a directory
           p->type = segmentType::Dir;
           p->fileId = dirId;
+          /* Add "/" to the end of the string so that
+           * /path/to/file will be indexed as:
+           * {"/path/", "/to/", "/file"}
+           */
+          auto dir_str = x + "/";
 
           {
             std::lock_guard<std::mutex> guard(seglist_mu);
@@ -529,8 +552,8 @@ public:
           }
 
           // TODO: Create a function
-          for (int i = 0; i < x.size() + 1; i++) {
-            auto s = x.substr(i, std::min(static_cast<size_t>(8), x.size() - i));
+          for (int i = 0; i < dir_str.size() + 1; i++) {
+            auto s = dir_str.substr(i, std::min(static_cast<size_t>(8), dir_str.size() - i));
             cm_dir.addStr(s, dirId);
           }
 
@@ -561,7 +584,7 @@ public:
     s += seg->str;
     while (seg->parent->parent != nullptr) {
       seg = seg->parent;
-      s = seg->str + dirSeparator + s;
+      s = seg->str + s;
       // out.print(seg, "(", seg->str, ")", ",");
     }
     // out.printl(s);
@@ -707,11 +730,6 @@ public:
       delete cand;
     }
 
-    // TODO:
-    // for (auto &[fid, cand] : dirCandMap) {
-    // delete cand;
-    // }
-
     // Sort highest score first
     std::sort(results.begin(), results.end(),
               [](std::pair<float, int> a, std::pair<float, int> b) { return a.first > b.first; });
@@ -738,17 +756,15 @@ public:
 
     CandMap fileCandMap;
     CandMap dirCandMap;
-    auto &candmap = fileCandMap;
     waitUntilDone();
     std::vector<std::pair<float, std::string>> results;
 
     if (includeFiles) {
       searchCharTree(query, fileCandMap, cm);
+      // out.printl("size:",fileCandMap.size());
     }
 
-    if (includeDirs) {
-      searchCharTree(query, dirCandMap, cm_dir);
-    }
+    searchCharTree(query, dirCandMap, cm_dir);
 
     if (includeFiles) {
       addParentScores(fileCandMap);
@@ -763,8 +779,9 @@ public:
     }
     segsToClean.clear();
 
+    // TODO: Need to call this just to delete candidates
+    auto res_dir = candidatesToVec(dirCandMap);
     if (includeDirs) {
-      auto res_dir = candidatesToVec(dirCandMap);
       for (const auto &[score, id] : res_dir) {
         results.push_back(std::pair<float, std::string>{score, getString(id, true)});
       }
@@ -772,8 +789,10 @@ public:
 
     if (includeFiles) {
       auto res_file = candidatesToVec(fileCandMap);
-      std::vector<std::pair<float, std::string>> results;
+      // out.printl("size2:",fileCandMap.size());
       for (const auto &[score, id] : res_file) {
+
+        // out.print("|",getString(id),"|");
         results.push_back(std::pair<float, std::string>{score, getString(id)});
       }
     }

@@ -258,42 +258,11 @@ std::vector<std::string> splitString(const std::string &str, char delimiter) {
   return result;
 }
 
-// Convert int64_t to binary string
-[[nodiscard]] std::string int64ToBinaryString(const int64_t &num) {
-  std::string result;
-  for (int i = 63; i >= 0; --i) {
-    result += ((num >> i) & 1) ? '1' : '0';
-  }
-  return result;
-}
-
-// Debug. Convert a (8 char) string represented as int64_t to std::string
-[[nodiscard]] std::string int64ToStr(const int64_t &key) {
-  int nchars = 8;
-  std::string str;
-  int multip = nchars * 8;
-  for (int i = 0; i <= nchars; i++) {
-    char c = (key >> multip) & 255;
-    str.push_back(c);
-    multip -= 8;
-  }
-  return str;
-}
-
 // Debug
 void printVector(const std::vector<float> &vec) {
   for (const auto &value : vec) {
     std::cout << value << " ";
   }
-}
-
-// Debug
-[[nodiscard]] std::string charToBinaryString(const char &chr) {
-  std::string result;
-  for (int i = 7; i >= 0; --i) {
-    result += ((chr >> i) & 1) ? '1' : '0';
-  }
-  return result;
 }
 
 class Candidate;
@@ -308,7 +277,6 @@ struct PathSegment {
   Candidate *cand;
   PathSegment *parent;
   std::mutex mu;
-  // ankerl::unordered_dense::map<std::string, PathSegment *> children;
   std::map<std::string, PathSegment *> children;
 
   segmentType type = segmentType::Dir;
@@ -369,26 +337,15 @@ struct Candidate {
   [[nodiscard]] float operator[](int idx) const { return v_charscore[idx]; }
 };
 
-// This seems to give 10x speed improvement over std::unordered_map
-typedef ankerl::unordered_dense::map<int64_t, std::set<PathSegment *> *> SegMap;
-// typedef std::unordered_map<int64_t, std::set<PathSegment *> *> SegMap;
 
 typedef ankerl::unordered_dense::map<int, Candidate *> CandMap;
 // typedef std::unordered_map<int, Candidate *> CandMap;
-
-typedef std::shared_ptr<SegMap> MapType;
-typedef std::vector<MapType> MapVec;
 
 class StringIndex {
 private:
   int tmp;
   char dirSeparator = '/'; // Usually '/', '\' or '\0' (no separator)
   int numStrings = 0;
-
-  MapVec dirmaps;
-  std::array<std::mutex, 9> mts_d; // for dirmaps
-  MapVec filemaps;
-  std::array<std::mutex, 9> mts_f; // for filemaps
 
   std::vector<PathSegment *> segsToClean;
 
@@ -412,10 +369,6 @@ public:
     root->parent = nullptr;
     root->str = "[ROOT]";
 
-    for (int i = 0; i <= 8; i++) {
-      filemaps.push_back(MapType(new SegMap));
-      dirmaps.push_back(MapType(new SegMap));
-    }
 
     // Threads between 4 and 6
     // We don't seem to get any benefit from more than 6 threads even if the hardware supports it
@@ -433,20 +386,6 @@ public:
   void setDirWeight(float val) { dirWeight = val; }
 
   ~StringIndex() {
-    for (auto x : dirmaps) {
-      for (auto y : *x) {
-        y.second->clear();
-        delete (y.second);
-      }
-      x->clear();
-    }
-    for (auto x : filemaps) {
-      for (auto y : *x) {
-        y.second->clear();
-        delete (y.second);
-      }
-      x->clear();
-    }
     clearPathSegmentChildren(root);
   }
 
@@ -500,7 +439,6 @@ public:
     } else {
       // Split path to segments
       segs = splitString(filePath, separator);
-      // segs = splitStringOLD(filePath, separator);
     }
 
     PathSegment *prev = nullptr;
@@ -623,64 +561,6 @@ public:
 
   @param query String to search for inside the index
   */
-
-  [[nodiscard]] std::vector<std::pair<float, int>> findSimilarOld(std::string query) {
-    return findSimilarOld(query, 2);
-  }
-
-  [[nodiscard]] std::vector<std::pair<float, int>> findSimilarOld(std::string query, int minChars) {
-    CandMap fileCandMap;
-    CandMap dirCandMap;
-
-    waitUntilDone();
-
-    // Find both files and directories that match the input query
-    addToCandMap(fileCandMap, query, filemaps);
-    addToCandMap(dirCandMap, query, dirmaps);
-
-    /* If parent dir of a file matches the input string add the scores of the direcotry to the
-     scores of the file */
-    addParentScores(fileCandMap);
-
-    // Set all candidate pointers to nullptr so they won't mess up future searches
-    for (auto seg : segsToClean) {
-      seg->cand = nullptr;
-    }
-    segsToClean.clear();
-
-    // Form return result, 2d array with file id's and scores
-    std::vector<std::pair<float, int>> results;
-    for (auto &[fid, cand] : fileCandMap) {
-      std::pair<float, int> v;
-      float sc = cand->getScore();
-      v.first = sc;
-      v.second = fid;
-      results.push_back(v);
-      delete cand;
-    }
-
-    for (auto &[fid, cand] : dirCandMap) {
-      delete cand;
-    }
-
-    // Sort highest score first
-    std::sort(results.begin(), results.end(),
-              [](std::pair<float, int> a, std::pair<float, int> b) { return a.first > b.first; });
-    return results;
-  }
-
-  // Return int64_t representation of the first nchars in str, starting from index i
-  [[nodiscard]] int64_t getKeyAtIdx(const std::string &str, int i, int nchars) const {
-    int64_t key = 0;
-    for (int i_char = 0; i_char < nchars; i_char++) {
-      key = key | static_cast<int64_t>(str[i + i_char]);
-      if (i_char < nchars - 1) {
-        // Shift 8 bits to the left except on the last iteration
-        key = key << 8;
-      }
-    }
-    return key;
-  }
 
   void searchCharTree(const std::string &query, CandMap &candmap, CharTree &chartr) {
 
@@ -829,25 +709,6 @@ public:
     return results;
   }
 
-  void debug() {
-
-    int nchars = 3;
-    for (const auto &[key, value] : (*filemaps[nchars])) {
-      int64_t x;
-      x = key;
-      int multip = nchars * 8;
-      for (int i = 0; i <= nchars; i++) {
-        char c = (x >> multip) & 255;
-        std::cout << c;
-        multip -= 8;
-      }
-      std::cout << "\n";
-      // for (auto y : *value) {
-      // std::cout << y << " ";
-      // }
-      // std::cout << "\n";
-    }
-  }
 
 private:
   void clearPathSegmentChildren(PathSegment *p) {
@@ -857,102 +718,6 @@ private:
       }
     }
     delete p;
-  }
-
-  void addPathSegmentKeys(PathSegment *p) {
-    // Input p is part of a path, e.g. 'barxyz' if path is /foo/barxyz/baz.txt
-    // This function generates int64 representations (keys) of all substrings of size 2..8 in that
-    // path segment and stores pointer to p in hash tables using these int values as keys.
-
-    int maxChars = 8;
-    int minChars = 2;
-
-    std::string str = p->str;
-    if (p->str.size() < 2) {
-      return;
-    }
-    if (static_cast<int>(p->str.size()) < maxChars) {
-      maxChars = p->str.size();
-    }
-
-    for (int sublen = minChars; sublen <= maxChars; sublen++) {
-
-      std::mutex *mu;
-      MapType map;
-      if (p->type == segmentType::File) {
-        map = filemaps[sublen];
-        mu = &mts_f[sublen];
-      } else {
-        map = dirmaps[sublen];
-        mu = &mts_d[sublen];
-      }
-
-      int count = str.size() - sublen + 1;
-
-      int64_t keys[count + 1];
-      for (int i = 0; i <= count; i++) {
-        keys[i] = getKeyAtIdx(str, i, sublen);
-      }
-
-      mu->lock();
-      for (int i = 0; i <= count; i++) {
-        // int64_t key = getKeyAtIdx(str, i, sublen);
-        auto key = keys[i];
-
-        // Create a new std::set for key if doesn't exist already
-        auto it = map->find(key);
-        if (it == map->end()) {
-          (*map)[key] = new std::set<PathSegment *>;
-        }
-        (*map)[key]->insert(p);
-      }
-      mu->unlock();
-    }
-  }
-
-  // Find pathsegments from <map> that include the substring of <str> which starts at index <i>
-  // and is of length <nchars>.
-  [[nodiscard]] std::vector<PathSegment *> findSimilarForNgram(std::string str, int i, int nchars,
-                                                               SegMap &map) const {
-
-    assert(i + nchars <= static_cast<int>(str.size()));
-    std::vector<PathSegment *> res;
-
-    // Take substring of str, starting at i, spanning nchars
-    // transform that to 64 bit integer
-    int64_t key = getKeyAtIdx(str, i, nchars);
-    // Find all path segments in map that have the same substring
-    if (auto it = map.find(key); it != map.end()) { // key found
-      auto set = it->second;
-      for (auto value : *set) {
-        res.push_back(value);
-      }
-    }
-    return res;
-  }
-
-  void addToCandMap(CandMap &candmap, std::string query,
-                    MapVec &map // filemaps or dirmaps
-  ) {
-    int maxChars = 8;
-    int minChars = 2;
-    if (static_cast<int>(query.size()) < maxChars) {
-      maxChars = query.size();
-    }
-
-    // Loop all substring lengths between minChars..maxChars
-    for (int sublen = minChars; sublen <= maxChars; sublen++) {
-      int count = query.size() - sublen + 1;
-
-      // Loop all possible start positions
-      for (int i = 0; i < count; i++) {
-        std::vector<PathSegment *> res = findSimilarForNgram(query, i, sublen, *(map[sublen]));
-
-        for (PathSegment *p : res) {
-          addToResults(p, query, i, sublen, candmap);
-        }
-      }
-    }
   }
 
   // Add parent directories scores to files

@@ -73,6 +73,27 @@ struct CharNode {
   CharNode *children;
   CharNode() : ids(nullptr), ids_sz(0), c(0), size(0), children(nullptr) {}
 
+  void init() {
+    ids = nullptr;
+    ids_sz = 0;
+    c = 0;
+    size = 0;
+    children = nullptr;
+  }
+
+  void dealloc() {
+    if (children != nullptr) {
+      for (CharNode *it = children; it != children + size; it++) {
+        it->dealloc();
+      }
+      free(children);
+    }
+    delete[] ids;
+  }
+
+  ~CharNode() {
+  }
+
   // Gets Id's stored in this node and all child nodes combined
   std::set<int> getIds() {
     std::set<int> set;
@@ -134,6 +155,10 @@ public:
   CharNode *root;
 
   CharTree() { root = new CharNode; }
+  ~CharTree() {
+    root->dealloc();
+    // delete root; // TODO?
+  }
 
   void addStr(std::string s, int id) {
     if (s.size() < 2) {
@@ -161,13 +186,15 @@ public:
         }
       }
       if (!found) {
-        auto x = new CharNode[cn->size + 1];
+        // auto x = new CharNode[cn->size + 1];
+        CharNode *x = (CharNode *)malloc(sizeof(CharNode) * (cn->size + 1));
         if (cn->size > 0) {
           memcpy(x, cn->children, sizeof(CharNode) * (cn->size));
-          delete[] cn->children;
+          free(cn->children);
         }
         cn->children = x;
         CharNode *nn = &(cn->children[cn->size]);
+        nn->init();
         nn->c = c;
         cn->size++;
         cn = nn;
@@ -337,7 +364,6 @@ struct Candidate {
   [[nodiscard]] float operator[](int idx) const { return v_charscore[idx]; }
 };
 
-
 typedef ankerl::unordered_dense::map<int, Candidate *> CandMap;
 // typedef std::unordered_map<int, Candidate *> CandMap;
 
@@ -368,7 +394,6 @@ public:
     root = new PathSegment();
     root->parent = nullptr;
     root->str = "[ROOT]";
-
 
     // Threads between 4 and 6
     // We don't seem to get any benefit from more than 6 threads even if the hardware supports it
@@ -708,7 +733,6 @@ public:
 
     return results;
   }
-
 
 private:
   void clearPathSegmentChildren(PathSegment *p) {

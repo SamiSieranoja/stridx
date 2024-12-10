@@ -91,8 +91,7 @@ struct CharNode {
     delete[] ids;
   }
 
-  ~CharNode() {
-  }
+  ~CharNode() {}
 
   // Gets Id's stored in this node and all child nodes combined
   std::set<int> getIds() {
@@ -157,7 +156,7 @@ public:
   CharTree() { root = new CharNode; }
   ~CharTree() {
     root->dealloc();
-    // delete root; // TODO?
+    delete root;
   }
 
   void addStr(std::string s, int id) {
@@ -336,6 +335,7 @@ struct Candidate {
   float maxscore;
   int candLen; // Length of candidate
 
+  ~Candidate(){};
   Candidate(){};
   Candidate(PathSegment *_seg, int _len) : seg(_seg), len(_len) {
     // Initialize v_charscores with zeros
@@ -410,9 +410,7 @@ public:
   void setDirSeparator(char sep) { dirSeparator = sep; }
   void setDirWeight(float val) { dirWeight = val; }
 
-  ~StringIndex() {
-    clearPathSegmentChildren(root);
-  }
+  ~StringIndex() { clearPathSegmentChildren(root); }
 
   void addStrToIndex(std::string filePath, int fileId) {
     addStrToIndex(filePath, fileId, dirSeparator);
@@ -649,6 +647,7 @@ public:
     searchCharTree(query, dirCandMap, cm_dir);
     addParentScores(dirCandMap);
     auto results = candidatesToVec(dirCandMap);
+
     return results;
   }
 
@@ -730,6 +729,7 @@ public:
     segsToClean.clear();
 
     auto results = candidatesToVec(fileCandMap);
+    auto tmp = candidatesToVec(dirCandMap); // TODO: call just to release memory
 
     return results;
   }

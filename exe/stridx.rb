@@ -1,4 +1,5 @@
 #!/usr/bin/env ruby
+require 'fileutils'
 
 $:.unshift File.dirname(__FILE__) + "/.."
 
@@ -12,5 +13,9 @@ elsif ARGV[0] == "bash"
 /
 else
   require "daemons"
-  Daemons.run(File.dirname(__FILE__) + "/../runserver.rb")
+  
+  pid_dir_path = File.expand_path("~/.config/stridx/")
+  FileUtils.mkdir_p(pid_dir_path)
+  Daemons.run(File.dirname(__FILE__) + "/../runserver.rb", 
+  {:dir_mode => :normal, :dir => pid_dir_path })
 end

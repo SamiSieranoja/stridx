@@ -86,9 +86,10 @@ module StrIdx
           # puts "Received from client: #{data}"
           if data.match(/^find:(.*)/)
             query = Regexp.last_match(1)
+            # TODO: not sure which is best as default:
             # res = idx.find(query)
-            # res = idx.findFilesAndDirs(query)
-            res = idx.findDirs(query)
+            # res = idx.findDirs(query)
+            res = idx.findFilesAndDirs(query)
             # response = res.collect { |x| flist[x[0]] }.join("\n")
             response = res.collect { |x| "/"+x[0] }.join("\n")
 

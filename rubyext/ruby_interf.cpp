@@ -50,6 +50,33 @@ VALUE StringIndexWaitUntilDone(VALUE self) {
 }
   
 
+VALUE StringIndexFindNum(VALUE self, VALUE str, VALUE _limit) {
+  VALUE ret;
+  std::string s1 = StringValueCStr(str);
+
+  void *data;
+  TypedData_Get_Struct(self, int, &str_idx_type, data);
+  StrIdx::StringIndex *idx = (StrIdx::StringIndex *)data;
+  
+  
+  int limit = NUM2INT(_limit);
+
+  ret = rb_ary_new();
+  const std::vector<std::pair<float, int>> &results = idx->findSimilar(s1);
+  int i = 0;
+  for (const auto &res : results) {
+    VALUE arr = rb_ary_new();
+    rb_ary_push(arr, INT2NUM(res.second));
+    rb_ary_push(arr, DBL2NUM(res.first));
+    rb_ary_push(ret, arr);
+    i++;
+    if (i >= limit) {
+      break;
+    }
+  }
+  return ret;
+}
+
 VALUE StringIndexFind(VALUE self, VALUE str) {
   VALUE ret;
   std::string s1 = StringValueCStr(str);
@@ -158,6 +185,7 @@ void Init_stridx(void) {
   rb_define_method(classStringIndex, "add", StringIndexAddSegments, 2);
   rb_define_method(classStringIndex, "waitUntilDone", StringIndexWaitUntilDone, 0);
   rb_define_method(classStringIndex, "find", StringIndexFind, 1);
+  rb_define_method(classStringIndex, "findNum", StringIndexFindNum, 2);
   rb_define_method(classStringIndex, "findFilesAndDirs", StringIndexFindFilesAndDirs, 1);
   rb_define_method(classStringIndex, "findDirs", StringIndexFindDirs, 1);
   

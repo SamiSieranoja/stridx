@@ -324,7 +324,11 @@ struct PathSegment {
 
 // Candidate for result in string (filename) search
 struct Candidate {
+
+	//This holds the subscores for each character in the query string
   std::vector<float> v_charscore;
+  
+  
   PathSegment *seg;
   int fileId;
   // The string that this candidate represents
@@ -343,6 +347,7 @@ struct Candidate {
     candLen = seg->size();
   }
 
+	// Sum subscores in v_charscore and normalize to get final score
   [[nodiscard]] float getScore() const {
     int i = 0;
     float score = 0.0;
@@ -375,13 +380,14 @@ private:
 
   std::vector<PathSegment *> segsToClean;
 
+	// Maps id's stored in charTree to corresponding PathSegment's
   std::unordered_map<int, PathSegment *> seglist;
   std::unordered_map<int, PathSegment *> seglist_dir;
   std::mutex seglist_mu;
 
   PathSegment *root;
   int dirId = 0;
-  float dirWeight = 0.7; // Give only 70% of score if match is for a directory
+  float dirWeight = 1.0; // =0.7: Give only 70% of score if match is for a directory
 
   std::unique_ptr<ThreadPool> pool;
   Output out{1}; // verbose level = 1
@@ -588,12 +594,17 @@ public:
   void searchCharTree(const std::string &query, CandMap &candmap, CharTree &chartr) {
 
     int last_start = query.size() - 2;
+    // Loop all possible start positions in query string. Indexes [0..(n-3)]
     for (int start = 0; start <= last_start; start++) {
       CharNode *cn = chartr.root;
+      
+      // select a suffix (substring) starting from start, but cap length to 8 chars
       int end = std::min(start + 7, ((int)query.size()) - 1);
       int nchars = end - start + 1;
       std::string s = query.substr(start, nchars);
 
+			// Loop all chars of the query substring
+			// Traverse from the 
       for (int i = 0; i < s.size(); i++) {
         char c = s[i];
         CharNode *x = cn->find(c);
@@ -601,12 +612,20 @@ public:
           cn = x;
           // Consider scores only for substrings with size >= 2
           if (i > 0) {
+          	// If we've reached here, size of substring is i+2
+          
+          	// Get identifiers of files that include substring
+          	// query[start..(start+i+1)] ??
             std::set<int> ids = cn->getIds();
             for (const int &y : ids) {
               PathSegment *p = nullptr;
+
+							// Searching in file segments 
+							// (or no file/dir separation)
               if (&chartr == &cm) {
                 p = seglist[y];
               } else {
+							// Searching in dir segments 
                 p = seglist_dir[y];
               }
               assert(p != nullptr);

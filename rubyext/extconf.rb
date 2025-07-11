@@ -5,7 +5,7 @@ require 'mkmf'
 module_name = "stridx"
 extension_name = 'stridx'
 
-$CXXFLAGS << " -Wall -Wno-unused-variable -O3" 
+$CXXFLAGS << " -std=c++17 -Wall -Wno-unused-variable -O3" 
 
 have_library( 'stdc++');
 

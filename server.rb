@@ -33,6 +33,7 @@ module StrIdx
     def initialize(dir_list, daemonize: false)
       idx = StrIdx::StringIndex.new
       idx.setDirSeparator("/")
+      idx.setDirWeight(0.85) # Lower scores for directory matches
 
       t = Time.new
 

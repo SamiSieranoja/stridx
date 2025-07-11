@@ -66,7 +66,7 @@ eval "$(stridx.rb bash)"
 
 To autostart server, add following line to .bashrc:
 ```
-[ ! -f ~/.stridx/sock ] && stridx.rb start -- ~/Documents/ ~/Pictures/
+stridx.rb start -- ~/Documents/ ~/Pictures/
 ```
 
 
@@ -79,7 +79,6 @@ Stop server:
 ```
 stridx.rb stop
 ```
-In case stop doesn't work, try: `kill $(pgrep -f runserver.rb | tail -n 1)`
 
 Start indexing server (on foreground, to debug):
 ```

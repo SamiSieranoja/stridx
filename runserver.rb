@@ -1,4 +1,6 @@
 #!/usr/bin/env ruby
+
+# Add cur dir to load path
 $:.unshift File.dirname(__FILE__)
 
 def kill_signal

@@ -48,7 +48,6 @@ VALUE StringIndexWaitUntilDone(VALUE self) {
   ((StrIdx::StringIndex *)data)->waitUntilDone();
   return self;
 }
-  
 
 VALUE StringIndexFindNum(VALUE self, VALUE str, VALUE _limit) {
   VALUE ret;
@@ -57,8 +56,7 @@ VALUE StringIndexFindNum(VALUE self, VALUE str, VALUE _limit) {
   void *data;
   TypedData_Get_Struct(self, int, &str_idx_type, data);
   StrIdx::StringIndex *idx = (StrIdx::StringIndex *)data;
-  
-  
+
   int limit = NUM2INT(_limit);
 
   ret = rb_ary_new();
@@ -136,7 +134,8 @@ VALUE StringIndexFindDirs(VALUE self, VALUE str) {
   StrIdx::StringIndex *idx = (StrIdx::StringIndex *)data;
 
   ret = rb_ary_new();
-  const std::vector<std::pair<float, std::string>> &results = idx->findFilesAndDirectories(s1,false,true);
+  const std::vector<std::pair<float, std::string>> &results =
+      idx->findFilesAndDirectories(s1, false, true);
   int limit = 40;
   int i = 0;
   for (const auto &res : results) {
@@ -151,10 +150,6 @@ VALUE StringIndexFindDirs(VALUE self, VALUE str) {
   }
   return ret;
 }
-
-
-
-
 
 VALUE StringIndexSetDirSeparator(VALUE self, VALUE str) {
   char c = '/';
@@ -176,6 +171,17 @@ VALUE StringIndexSetDirSeparator(VALUE self, VALUE str) {
   return self;
 }
 
+VALUE StringIndexSetDirWeight(VALUE self, VALUE d) {
+  if (TYPE(d) == T_FLOAT) {
+    double c_float = NUM2DBL(rb_funcall(d, rb_intern("to_f"), 0));
+    void *data;
+    TypedData_Get_Struct(self, int, &str_idx_type, data);
+    StrIdx::StringIndex *idx = (StrIdx::StringIndex *)data;
+    idx->setDirWeight(c_float);
+  }
+  return self;
+}
+
 void Init_stridx(void) {
 
   VALUE mStrIdx = rb_define_module("StrIdx");
@@ -186,12 +192,11 @@ void Init_stridx(void) {
   rb_define_method(classStringIndex, "waitUntilDone", StringIndexWaitUntilDone, 0);
   rb_define_method(classStringIndex, "find", StringIndexFind, 1);
   rb_define_method(classStringIndex, "findNum", StringIndexFindNum, 2);
+  rb_define_method(classStringIndex, "setDirWeight", StringIndexSetDirWeight, 1);
   rb_define_method(classStringIndex, "findFilesAndDirs", StringIndexFindFilesAndDirs, 1);
   rb_define_method(classStringIndex, "findDirs", StringIndexFindDirs, 1);
-  
+
   rb_define_method(classStringIndex, "setDirSeparator", StringIndexSetDirSeparator, 1);
-  
-  
 }
 
 } // End extern "C"

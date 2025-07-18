@@ -77,22 +77,21 @@ module StrIdx
 
           # Read data from the client
           data = client.recv(1024)
-
-          if data.match(/^stop$/)
+          if data.nil?
+            # puts "GOT NIL"
+          elsif data.match(/^stop$/)
             puts "Got stop signal. Shutting down server."
             client.close
             break
-          end
-
           # puts "Received from client: #{data}"
-          if data.match(/^find:(.*)/)
+          elsif data.match(/^find:(.*)/)
             query = Regexp.last_match(1)
             # TODO: not sure which is best as default:
             # res = idx.find(query)
             # res = idx.findDirs(query)
             res = idx.findFilesAndDirs(query)
             # response = res.collect { |x| flist[x[0]] }.join("\n")
-            response = res.collect { |x| "/"+x[0] }.join("\n")
+            response = res.collect { |x| "/" + x[0] }.join("\n")
 
             # Send a response back to the client
             client.puts response

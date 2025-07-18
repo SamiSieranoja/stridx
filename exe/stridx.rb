@@ -8,7 +8,8 @@ CUR_FILE = File.basename(__FILE__)
 PID_FILE = File.expand_path("~/.config/stridx/index.pid")
 LOCK_FILE = File.expand_path("~/.config/stridx/index.lock")
 
-
+pid_dir_path = File.expand_path("~/.config/stridx/")
+FileUtils.mkdir_p(pid_dir_path)
 
 # To prevent against race condition when two process started at the same time
 def obtain_lock_or_exit
@@ -91,9 +92,6 @@ def start(daemonize: false)
       File.delete(PID_FILE) if File.exist?(PID_FILE)
       exit
     end
-
-    pid_dir_path = File.expand_path("~/.config/stridx/")
-    FileUtils.mkdir_p(pid_dir_path)
   end
 
   StrIdx::Server.start ARGV

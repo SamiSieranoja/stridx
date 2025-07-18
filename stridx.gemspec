@@ -1,6 +1,6 @@
 Gem::Specification.new do |spec|
   spec.name = "StrIdx"
-  spec.version = "0.1.5"
+  spec.version = "0.1.7"
   spec.authors = ["Sami Sieranoja"]
   spec.email = ["sami.sieranoja@gmail.com"]
 
